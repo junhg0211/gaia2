@@ -10,12 +10,39 @@
   let canvas;
   let ctx;
 
+  class Camera {
+    constructor(x = 0.5, y = 0.5, zoom = 1000) {
+      this.x = x;
+      this.y = y;
+      this.zoom = zoom;
+    }
+
+    worldToScreen(worldX, worldY) {
+      const screenX = (worldX - this.x) * this.zoom + canvas.width / 2;
+      const screenY = (worldY - this.y) * this.zoom + canvas.height / 2;
+      return [screenX, screenY];
+    }
+
+    screenToWorld(screenX, screenY) {
+      const worldX = (screenX - canvas.width / 2) / this.zoom + this.x;
+      const worldY = (screenY - canvas.height / 2) / this.zoom + this.y;
+      return [worldX, worldY];
+    }
+  }
+
+  let camera = new Camera();
+
   function draw() {
     if (!ctx) return;
 
     /* Clear canvas */
     ctx.fillStyle = '#19191e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    /* draw map */
+    if (map !== null) {
+      map.draw(ctx, camera, canvas);
+    }
   }
 
   /* dataframe render setup */
@@ -36,8 +63,10 @@
     /* Initialize canvas */
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth * window.devicePixelRatio;
-    canvas.height = window.innerHeight * window.devicePixelRatio;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
 
     draw();
 

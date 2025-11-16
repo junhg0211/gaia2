@@ -50,18 +50,18 @@ export class Quadtree {
 
   /* children */
   getChild(index) {
-    if (!this.isDivided())
+    if (this.isLeaf())
       throw new Error("Cannot get child of a leaf quadtree node.");
     return this.children[index];
   }
 
   /* quadtree */
-  isDivided() {
-    return this.children !== null;
+  isLeaf() {
+    return this.value !== null;
   }
 
-  isLeaf() {
-    return this.children === null;
+  isDivided() {
+    return this.value === null;
   }
 
   subdivide() {
@@ -71,7 +71,7 @@ export class Quadtree {
       new Quadtree(this.value, this), // top-left
       new Quadtree(this.value, this), // top-right
       new Quadtree(this.value, this), // bottom-left
-      new Quadtree(this.valu, this)  // bottom-right
+      new Quadtree(this.value, this)  // bottom-right
     ];
     this.value = null;
   }
@@ -81,9 +81,11 @@ export class Quadtree {
 
     for (const child of this.children) child.mergeIfPossible();
 
-    const firstValue = this.children[0].getValue();
-    const allSame = this.children.every(child => child.isLeaf() && child.getValue() === firstValue);
+    const firstValue = this.getChild(0).isLeaf() ? this.getChild(0).getValue() : null;
+    if (firstValue === null)
+      return;
 
+    const allSame = this.children.every(child => child.isLeaf() && child.getValue() === firstValue);
     if (allSame) {
       this.value = firstValue;
       this.children = null;
@@ -92,7 +94,7 @@ export class Quadtree {
 
   /* image representation */
   fillPolygon(polygon, value, depth) {
-    if (depth === 0) {
+    if (depth <= 0 || depth === undefined) {
       const containsCenter = polygonContainsPoint(polygon, 0.5, 0.5);
 
       if (containsCenter) return this.setValue(value);
@@ -122,7 +124,7 @@ export class Quadtree {
   }
 
   fillCircle(x, y, radius, value, depth) {
-    if (depth === 0) {
+    if (depth <= 0 || depth === undefined) {
       const distance = Math.hypot(x - 0.5, y - 0.5);
       const containsCenter = distance <= radius;
 
@@ -130,23 +132,20 @@ export class Quadtree {
       else return;
     }
 
-    const corners = [
-      Math.hypot(0 - x, 0 - y), // top-left
-      Math.hypot(1 - x, 0 - y), // top-right
-      Math.hypot(0 - x, 1 - y), // bottom-left
-      Math.hypot(1 - x, 1 - y)  // bottom-right
-    ];
-    const allInside = corners.every(d => d <= radius);
-    const allOutside = corners.every(d => d > radius);
-    if (allInside) return this.setValue(value);
-    if (allOutside) return;
+    // closest point in square to circle center
+    const closestX = Math.max(0, Math.min(1, x));
+    const closestY = Math.max(0, Math.min(1, y));
+    const distance = Math.hypot(closestX - x, closestY - y);
+
+    if (distance >= radius)
+      return; // circle does not intersect square
 
     this.subdivide();
 
-    this.children[0].fillCircle(x * 2, y * 2, radius * 2, value, depth - 1);         // top-left
-    this.children[1].fillCircle(x * 2 - 1, y * 2, radius * 2, value, depth - 1);     // top-right
-    this.children[2].fillCircle(x * 2, y * 2 - 1, radius * 2, value, depth - 1);     // bottom-left
-    this.children[3].fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, value, depth - 1); // bottom-right
+    this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, value, depth - 1);         // top-left
+    this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, value, depth - 1);     // top-right
+    this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, value, depth - 1);     // bottom-left
+    this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, value, depth - 1); // bottom-right
 
     this.mergeIfPossible();
   }
@@ -200,9 +199,30 @@ export class Quadtree {
     return this.children[3].getValueAt(rdx, rdy);
   }
 
+  /* draw on ctx */
+  draw(ctx, camera, canvas, colorMap, x = 0, y = 0, step = 1) {
+    if (this.isLeaf()) {
+      const color = colorMap[this.value];
+      if (color === "transparent") return;
+
+      ctx.fillStyle = color;
+      const [sx, sy] = camera.worldToScreen(x, y);
+      const size = camera.zoom * Math.pow(0.5, step - 1);
+      ctx.fillRect(sx, sy, size, size);
+    } else {
+      step++;
+      this.getChild(0).draw(ctx, camera, canvas, colorMap, x, y, step);
+      this.getChild(1).draw(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step - 1), y, step);
+      this.getChild(2).draw(ctx, camera, canvas, colorMap, x, y + Math.pow(0.5, step - 1), step);
+      this.getChild(3).draw(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step - 1), y + Math.pow(0.5, step - 1), step);
+    }
+  }
+
   /* serialization */
   toJSON() {
     if (this.isLeaf()) {
+      if (this.value === null)
+        throw new Error("Cannot serialize a quadtree leaf with null value.");
       return this.value;
     } else {
       return [
@@ -221,7 +241,7 @@ export class Layer {
     this.parent = parent;
     this.colors = [new Color("Transparent", "transparent", this)];
     this.children = [];
-    this.quadtree = new Quadtree(this.colors[0].id);
+    this.quadtree = new Quadtree(this.colors[0].id, this);
     this.id = getMap(parent).getNextLayerId();
   }
 
@@ -247,6 +267,16 @@ export class Layer {
     return this.colors.some(color => color.id === colorId);
   }
 
+  /* draw on ctx */
+  draw(ctx, camera, canvas) {
+    const colorMap = {};
+    for (const color of this.colors) {
+      colorMap[color.id] = color.color;
+    }
+
+    this.quadtree.draw(ctx, camera, canvas, colorMap);
+  }
+
   /* serialization */
   toJSON() {
     return {
@@ -261,9 +291,9 @@ export class Layer {
 
 export class Map {
   constructor() {
-    this.layer = new Layer("Root", this);
     this.nextLayerId = 1;
     this.nextColorId = 1;
+    this.layer = new Layer("Root", this);
   }
 
   /* ids */
@@ -273,6 +303,11 @@ export class Map {
 
   getNextColorId() {
     return this.nextColorId++;
+  }
+
+  /* draw on ctx */
+  draw(ctx, camera, canvas) {
+    this.layer.draw(ctx, camera, canvas);
   }
 
   /* serialization */
@@ -294,9 +329,9 @@ function getMap(thing) {
 /* deserialization */
 export function mapFromJSON(json) {
   const map = new Map();
+  map.layer = layerFromJSON(json.layer, map);
   map.nextLayerId = json.nextLayerId;
   map.nextColorId = json.nextColorId;
-  map.layer = layerFromJSON(json.layer, map);
   return map;
 }
 

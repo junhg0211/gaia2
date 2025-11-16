@@ -1,18 +1,21 @@
 import { WebSocketServer } from 'ws';
-import { Map } from "../dataframe.js";
+import { Map, Color } from "../dataframe.js";
 
 /* server setup */
 const port = 48829;
 const host = "0.0.0.0";
 
 let map = new Map();
+let c = new Color("Red", "red", map.layer)
+map.layer.addColor(c);
+map.layer.quadtree.fillCircle(0.5, 0.5, 0.4, c.id, 6);
 
 const connections = [];
 const commands = [
   {
     prefix: 'load',
     action: (announce, send, content, args) => {
-      send(JSON.stringify(map.toJSON()));
+      send(`map\t${JSON.stringify(map.toJSON())}`);
     }
   }
 ]
