@@ -1,10 +1,10 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { Map, deserializeMap } from "../../../dataframe.js";
 
   /* websocket setup */
   const wsurl = 'ws://localhost:48829';
   let socket;
-  let messages = [];
 
   /* canvas setup */
   let canvas;
@@ -14,11 +14,24 @@
     if (!ctx) return;
 
     /* Clear canvas */
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = '#19191e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
+  /* dataframe render setup */
+  let map = null;
+
   /* onMount and onDestroy lifecycle hooks */
+  const commands = [
+    {
+      prefix: "map",
+      action: (send, args) => {
+        map = deserializeMap(args[0]);
+        draw();
+      }
+    }
+  ];
+
   onMount(() => {
     /* Initialize canvas */
     canvas = document.getElementById('canvas');
@@ -36,7 +49,16 @@
     });
 
     socket.addEventListener('message', (event) => {
-      messages = [...messages, event.data];
+      const data = event.data.split('\t');
+      const prefix = data[0];
+      const args = data.slice(1);
+
+      for (const command of commands) {
+        if (command.prefix === prefix) {
+          command.action(socket.send.bind(socket), args);
+          break;
+        }
+      }
     });
 
     socket.addEventListener('close', () => {

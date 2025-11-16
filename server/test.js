@@ -1,4 +1,4 @@
-import { Quadtree, Layer, serializeQuadtree, deserializeQuadtree, serializeLayer, deserializeLayer } from './dataframe.js';
+import { Quadtree, Layer, serializeQuadtree, deserializeQuadtree, serializeLayer, deserializeLayer } from '../dataframe.js';
 
 const assert = (condition, message) => {
   if (!condition) {
