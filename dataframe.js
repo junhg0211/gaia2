@@ -1,28 +1,19 @@
 /* data */
-
 export class Color {
-  constructor(name, color) {
+  constructor(name, color, parent) {
     this.name = name;
     this.color = color;
+    this.parent = parent;
+    this.id = getMap(parent).getNextColorId();
   }
 
-  /* name */
-
-  setName(name) {
-    this.name = name;
-  }
-
-  getName() {
-    return this.name;
-  }
-
-  /* color */
-setColor(color) {
-    this.color = color;
-  }
-
-  getColor() {
-    return this.color;
+  /* serialization */
+  toJSON() {
+    return {
+      id: this.id,
+      name: this.name,
+      color: this.color
+    };
   }
 }
 
@@ -39,32 +30,32 @@ function polygonContainsPoint(polygon, x, y) {
 }
 
 export class Quadtree {
-  constructor(value) {
+  constructor(value, parent) {
     this.value = value;
     this.children = null;
+    this.parent = parent;
   }
 
   /* value */
-
   setValue(value) {
     this.value = value;
     this.children = null;
   }
 
   getValue() {
+    if (this.isDivided())
+      throw new Error("Cannot get value of a divided quadtree node.");
     return this.value;
   }
 
   /* children */
-
   getChild(index) {
-    if (!this.isDivided()) return null;
-
+    if (!this.isDivided())
+      throw new Error("Cannot get child of a leaf quadtree node.");
     return this.children[index];
   }
 
   /* quadtree */
-
   isDivided() {
     return this.children !== null;
   }
@@ -77,10 +68,10 @@ export class Quadtree {
     if (this.isDivided()) return;
 
     this.children = [
-      new Quadtree(this.value), // top-left
-      new Quadtree(this.value), // top-right
-      new Quadtree(this.value), // bottom-left
-      new Quadtree(this.value)  // bottom-right
+      new Quadtree(this.value, this), // top-left
+      new Quadtree(this.value, this), // top-right
+      new Quadtree(this.value, this), // bottom-left
+      new Quadtree(this.valu, this)  // bottom-right
     ];
     this.value = null;
   }
@@ -100,7 +91,6 @@ export class Quadtree {
   }
 
   /* image representation */
-
   fillPolygon(polygon, value, depth) {
     if (depth === 0) {
       const containsCenter = polygonContainsPoint(polygon, 0.5, 0.5);
@@ -209,40 +199,35 @@ export class Quadtree {
     const rdx = lux - 1, rdy = luy - 1;
     return this.children[3].getValueAt(rdx, rdy);
   }
+
+  /* serialization */
+  toJSON() {
+    if (this.isLeaf()) {
+      return this.value;
+    } else {
+      return [
+        this.children[0].toJSON(),
+        this.children[1].toJSON(),
+        this.children[2].toJSON(),
+        this.children[3].toJSON()
+      ];
+    }
+  }
 }
 
 export class Layer {
-  constructor(id, name, quadtree) {
+  constructor(name, parent) {
     this.name = name;
-    this.colors = [];
+    this.parent = parent;
+    this.colors = [new Color("Transparent", "transparent", this)];
     this.children = [];
-    this.quadtree = quadtree;
-  }
-
-  /* id */
-
-  getId() {
-    return this.id;
-  }
-
-  /* name */
-
-  setName(name) {
-    this.name = name;
-  }
-
-  getName() {
-    return this.name;
+    this.quadtree = new Quadtree(this.colors[0].id);
+    this.id = getMap(parent).getNextLayerId();
   }
 
   /* colors */
-
   addColor(color) {
     this.colors.push(color);
-  }
-
-  getColors() {
-    return this.colors;
   }
 
   includesColor(colorName) {
@@ -250,49 +235,38 @@ export class Layer {
   }
 
   /* children */
-
   addChild(layer) {
     this.children.push(layer);
-  }
-
-  getChildren() {
-    return this.children;
   }
 
   includesLayer(layerId) {
     return this.children.some(layer => layer.getId() === layerId);
   }
 
-  /* quadtree */
-
-  setQuadtree(quadtree) {
-    this.quadtree = quadtree;
+  includesColor(colorId) {
+    return this.colors.some(color => color.id === colorId);
   }
 
-  getQuadtree() {
-    return this.quadtree;
+  /* serialization */
+  toJSON() {
+    return {
+      id: this.id,
+      name: this.name,
+      colors: this.colors.map(color => color.toJSON()),
+      quadtree: this.quadtree.toJSON(),
+      children: this.children.map(child => child.toJSON())
+    };
   }
 }
 
 export class Map {
   constructor() {
-    this.layer = null;
+    this.layer = new Layer("Root", this);
     this.nextLayerId = 1;
     this.nextColorId = 1;
   }
 
-  /* layer */
-
-  setLayer(layer) {
-    this.layer = layer;
-  }
-
-  getLayer() {
-    return this.layer;
-  }
-
   /* ids */
-
   getNextLayerId() {
     return this.nextLayerId++;
   }
@@ -300,82 +274,56 @@ export class Map {
   getNextColorId() {
     return this.nextColorId++;
   }
-}
 
-/* serialization */
-
-export function serializeQuadtree(quadtree) {
-  if (quadtree.isLeaf()) {
-    return quadtree.getValue();
+  /* serialization */
+  toJSON() {
+    return {
+      layer: this.layer.toJSON(),
+      nextLayerId: this.nextLayerId,
+      nextColorId: this.nextColorId
+    };
   }
-
-  return [
-    serializeQuadtree(quadtree.getChild(0)),
-    serializeQuadtree(quadtree.getChild(1)),
-    serializeQuadtree(quadtree.getChild(2)),
-    serializeQuadtree(quadtree.getChild(3))
-  ];
 }
 
-export function deserializeQuadtree(data) {
-  if (!Array.isArray(data)) {
-    return new Quadtree(data);
-  }
-
-  const quadtree = new Quadtree(null);
-  quadtree.subdivide();
-  quadtree.children[0] = deserializeQuadtree(data[0]);
-  quadtree.children[1] = deserializeQuadtree(data[1]);
-  quadtree.children[2] = deserializeQuadtree(data[2]);
-  quadtree.children[3] = deserializeQuadtree(data[3]);
-  quadtree.mergeIfPossible();
-  return quadtree;
+function getMap(thing) {
+  if (thing instanceof Map)
+    return thing;
+  return thing.parent;
 }
 
-export function serializeColor(color) {
-  return {
-    name: color.getName(),
-    color: color.getColor()
-  };
+/* deserialization */
+export function mapFromJSON(json) {
+  const map = new Map();
+  map.nextLayerId = json.nextLayerId;
+  map.nextColorId = json.nextColorId;
+  map.layer = layerFromJSON(json.layer, map);
+  return map;
 }
 
-export function deserializeColor(data) {
-  return new Color(data.name, data.color);
-}
-
-export function serializeLayer(layer) {
-  return {
-    id: layer.getId(),
-    name: layer.getName(),
-    colors: layer.getColors().map(serializeColor),
-    children: layer.getChildren().map(serializeLayer),
-    quadtree: serializeQuadtree(layer.getQuadtree())
-  };
-}
-
-export function deserializeLayer(data) {
-  const layer = new Layer(data.id, data.name, deserializeQuadtree(data.quadtree));
-  data.colors.forEach(colorData => {
-    layer.addColor(deserializeColor(colorData));
+function layerFromJSON(json, parent) {
+  const layer = new Layer(json.name, parent);
+  layer.id = json.id;
+  layer.colors = json.colors.map(colorJson => {
+    const color = new Color(colorJson.name, colorJson.color, layer);
+    color.id = colorJson.id;
+    return color;
   });
-  data.children.forEach(childData => {
-    layer.addChild(deserializeLayer(childData));
-  });
+  layer.quadtree = quadtreeFromJSON(json.quadtree, layer);
+  layer.children = json.children.map(childJson => layerFromJSON(childJson, layer));
   return layer;
 }
 
-export function serializeMap(map) {
-  return {
-    layer: serializeLayer(map.getLayer()),
-    nextLayerId: map.nextLayerId,
-    nextColorId: map.nextColorId
-  };
-}
-
-export function deserializeMap(data) {
-  const map = new Map();
-  map.setLayer(deserializeLayer(data.layer));
-  map.nextLayerId = data.nextLayerId;
-  map.nextColorId = data.nextColorId;
-  return map;
+function quadtreeFromJSON(json, parent) {
+  if (Array.isArray(json)) {
+    const node = new Quadtree(null, parent);
+    node.children = [
+      quadtreeFromJSON(json[0], node),
+      quadtreeFromJSON(json[1], node),
+      quadtreeFromJSON(json[2], node),
+      quadtreeFromJSON(json[3], node)
+    ];
+    return node;
+  } else {
+    return new Quadtree(json, parent);
+  }
 }

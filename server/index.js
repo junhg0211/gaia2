@@ -1,15 +1,18 @@
 import { WebSocketServer } from 'ws';
+import { Map } from "../dataframe.js";
 
 /* server setup */
 const port = 48829;
 const host = "0.0.0.0";
 
+let map = new Map();
+
 const connections = [];
 const commands = [
   {
-    prefix: 'echo',
+    prefix: 'load',
     action: (announce, send, content, args) => {
-      console.log(args);
+      send(JSON.stringify(map.toJSON()));
     }
   }
 ]
@@ -38,7 +41,10 @@ wss.on('connection', (ws) => {
     for (const command of commands) {
       if (content.startsWith(command.prefix)) {
         const args = content.slice(command.prefix.length).trim().split('\t');
-        command.action(announce, (msg) => send(ws, msg), content, args);
+        command.action(announce, (msg) => {
+          console.log(`${ws._socket.remoteAddress} >> ${msg}`);
+          send(ws, msg);
+        }, content, args);
         return;
       }
     }

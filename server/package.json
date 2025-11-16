@@ -2,7 +2,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "node test.js",
-    "dev": "nodemon test.js"
+    "dev": "nodemon index.js"
   },
   "type": "module",
   "dependencies": {

@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { Map, deserializeMap } from "../../../dataframe.js";
+  import { Map, mapFromJSON } from "../../../dataframe.js";
 
   /* websocket setup */
   const wsurl = 'ws://localhost:48829';
@@ -26,7 +26,7 @@
     {
       prefix: "map",
       action: (send, args) => {
-        map = deserializeMap(args[0]);
+        map = mapFromJSON(JSON.parse(args[0]));
         draw();
       }
     }
@@ -45,7 +45,7 @@
     socket = new WebSocket(wsurl);
 
     socket.addEventListener('open', () => {
-      console.log('WebSocket connection established');
+      socket.send("load");
     });
 
     socket.addEventListener('message', (event) => {
@@ -61,9 +61,7 @@
       }
     });
 
-    socket.addEventListener('close', () => {
-      console.log('WebSocket connection closed');
-    });
+    socket.addEventListener('close', () => { });
   });
 
   onDestroy(() => {
