@@ -35,6 +35,10 @@
       const [screenX2, screenY2] = this.worldToScreen(x2, y2);
       return (screenX2 < 0 || screenX1 > canvas.width || screenY2 < 0 || screenY1 > canvas.height);
     }
+
+    setZoom(zoom) {
+      this.zoom = Math.max(1000, Math.min(5000000, zoom));
+    }
   }
 
   let camera = new Camera();
@@ -147,10 +151,6 @@
     mouse.startY = event.clientY * window.devicePixelRatio;
     mouse.buttons |= (1 << event.button);
 
-    if (mouse.buttons & 2) {
-      canvas.style.cursor = 'grabbing';
-    }
-
     if (selectedTool.onmousebuttondown) {
       selectedTool.onmousebuttondown(event, toolVar);
     }
@@ -158,10 +158,6 @@
 
   function onmousebuttonup(event) {
     mouse.buttons &= ~(1 << event.button);
-
-    if (!(mouse.buttons & 2)) {
-      canvas.style.cursor = 'default';
-    }
 
     if (selectedTool.onmousebuttonup) {
       selectedTool.onmousebuttonup(event, toolVar);
@@ -174,8 +170,7 @@
     const [mouseWorldX, mouseWorldY] = camera.screenToWorld(mouse.x, mouse.y);
     camera.x = mouseWorldX;
     camera.y = mouseWorldY;
-    camera.zoom *= Math.exp(-normalDelta / 1000);
-    camera.zoom = Math.max(1000, Math.min(5000000, camera.zoom));
+    camera.setZoom(camera.zoom * Math.exp(-normalDelta / 1000));
     camera.x -= dx / camera.zoom;
     camera.y -= dy / camera.zoom;
     render();
@@ -228,7 +223,38 @@
       },
       onkeyup: () => {},
       onkeydown: () => {}
-    }
+    },
+    {
+      name: '확대/축소',
+      shortcut: 'z',
+      icon: 'zoom-in',
+      onstart: () => {
+        canvas.style.cursor = 'se-resize';
+      },
+      onend: () => {
+        canvas.style.cursor = 'default';
+      },
+      onmousemove: () => {
+        if (mouse.buttons & 1) {
+          const delta = (mouse.x + mouse.y) - (toolVar.startX + toolVar.startY);
+          const zoomFactor = 1 + (delta) * 0.01;
+          camera.setZoom(toolVar.originalZoom * zoomFactor);
+          render();
+        }
+      },
+      onmousebuttondown: () => {
+        if (mouse.buttons & 1) {
+          toolVar.originalCameraX = camera.x;
+          toolVar.originalCameraY = camera.y;
+          toolVar.originalZoom = camera.zoom;
+          toolVar.startX = mouse.x;
+          toolVar.startY = mouse.y;
+        }
+      },
+      onmousebuttonup: () => {},
+      onkeyup: () => {},
+      onkeydown: () => {}
+    },
   ];
 
   function selectTool(tool) {
