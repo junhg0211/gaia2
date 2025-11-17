@@ -124,6 +124,8 @@
   function onmousemove(event) {
     mouse.x = event.clientX * window.devicePixelRatio;
     mouse.y = event.clientY * window.devicePixelRatio;
+    mouse.dx = mouse.x - mouse.startX;
+    mouse.dy = mouse.y - mouse.startY;
 
     if (mouse.buttons & 2) {
       const deltaX = (mouse.startX - mouse.x) / camera.zoom;
@@ -184,7 +186,7 @@
   const toolVar = {};
   const tools = [
     {
-      name: 'Cursor',
+      name: '커서',
       shortcut: 'v',
       icon: 'cursor',
       onstart: () => {},
@@ -196,14 +198,34 @@
       onkeydown: () => {}
     },
     {
-      name: 'Pan',
+      name: '패닝',
       shortcut: 'h',
       icon: 'arrows-move',
-      onstart: () => {},
-      onend: () => {},
-      onmousemove: () => {},
-      onmousebuttondown: () => {},
-      onmousebuttonup: () => {},
+      onstart: () => {
+        canvas.style.cursor = 'grab';
+      },
+      onend: () => {
+        canvas.style.cursor = 'default';
+      },
+      onmousemove: () => {
+        if (mouse.buttons & 1) {
+          camera.x = toolVar.startCameraX - (mouse.x - toolVar.originalX) / camera.zoom;
+          camera.y = toolVar.startCameraY - (mouse.y - toolVar.originalY) / camera.zoom;
+          render();
+        }
+      },
+      onmousebuttondown: () => {
+        if (mouse.buttons & 1) {
+          toolVar.originalX = mouse.x;
+          toolVar.originalY = mouse.y;
+          toolVar.startCameraX = camera.x;
+          toolVar.startCameraY = camera.y;
+          canvas.style.cursor = 'grabbing';
+        }
+      },
+      onmousebuttonup: () => {
+        canvas.style.cursor = 'grab';
+      },
       onkeyup: () => {},
       onkeydown: () => {}
     }
@@ -302,6 +324,7 @@
           class="tool-button"
           disabled={selectedTool.name === tool.name}
           on:click={() => selectTool(tool)}
+          title="{tool.name} ({tool.shortcut})"
       >
         <i class="bi bi-{tool.icon}"></i>
       </button>
