@@ -22,6 +22,10 @@
       color: white;
       font-family: 'unifont', monospace;
     }
+
+    button, input, select, textarea {
+      font-family: 'unifont', monospace;
+    }
   </style>
 </svelte:head>
 

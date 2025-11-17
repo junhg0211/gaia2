@@ -365,6 +365,32 @@ export class Map {
     return this.nextColorId++;
   }
 
+  getLayerById(layerId) {
+    function searchLayer(layer, layerId) {
+      if (layer.id === layerId) return layer;
+      for (const childLayer of layer.children) {
+        const result = searchLayer(childLayer, layerId);
+        if (result) return result;
+      }
+      return null;
+    }
+    return searchLayer(this.layer, layerId);
+  }
+
+  getColorById(colorId) {
+    function searchLayerForColor(layer, colorId) {
+      for (const color of layer.colors) {
+        if (color.id === colorId) return color;
+      }
+      for (const childLayer of layer.children) {
+        const result = searchLayerForColor(childLayer, colorId);
+        if (result) return result;
+      }
+      return null;
+    }
+    return searchLayerForColor(this.layer, colorId);
+  }
+
   /* draw on ctx */
   draw(ctx, camera, canvas) {
     this.layer.draw(ctx, camera, canvas);

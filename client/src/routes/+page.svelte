@@ -1,11 +1,55 @@
 <script>
+  import Layer from "$lib/components/Layer.svelte";
   import { onMount, onDestroy } from 'svelte';
-  import { Map, mapFromJSON } from "../../../dataframe.js";
+  import { mapFromJSON, Color } from "../../../dataframe.js";
   import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
   const wsurl = 'ws://localhost:48829';
   let socket;
+
+  const protocol = [
+    {
+      prefix: "map",
+      action: (send, args) => {
+        map = mapFromJSON(JSON.parse(args[0]));
+        selectColor(map.layer.colors[0]);
+        draw();
+        render();
+      }
+    },
+    {
+      prefix: "newcolor",
+      action: (send, args) => {
+        const layerId = parseInt(args[0]);
+        const colorName = args[1];
+        const colorValue = args[2];
+
+        const layer = map.getLayerById(layerId);
+        if (!layer) return;
+        const newColor = new Color(colorName, colorValue, layer);
+        layer.colors.push(newColor);
+        rerender();
+      }
+    },
+    {
+      prefix: 'drawline',
+      action: (send, args) => {
+        const x0 = parseFloat(args[0]);
+        const y0 = parseFloat(args[1]);
+        const x1 = parseFloat(args[2]);
+        const y1 = parseFloat(args[3]);
+        const brushSize = parseFloat(args[4]);
+        const colorId = parseInt(args[5]);
+        const layer = map.layer;
+        const color = map.getColorById(colorId);
+        if (!color) return;
+        layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, 10);
+        layer.draw();
+        render();
+      }
+    },
+  ];
 
   /* canvas setup */
   let canvas;
@@ -64,6 +108,9 @@
   }
 
   function draw() {
+    if (!ctx) return;
+    if (!map) return;
+
     map.draw(ctx, camera, canvas);
   }
 
@@ -75,16 +122,30 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     /* render map */
-    if (map !== null) {
-      map.render(ctx, camera, canvas);
-    }
+    if (!map) return;
+
+    map.render(ctx, camera, canvas);
 
     /* render grid */
     renderGrid();
+
+    if (selectedTool.onrender) {
+      selectedTool.onrender(ctx, toolVar);
+    }
   }
 
   /* dataframe render setup */
   let map = null;
+  let selectedColor = null;
+  let mapRender = false;
+
+  function selectColor(color) {
+    selectedColor = color;
+  }
+
+  function rerender() {
+    mapRender = !mapRender;
+  }
 
   /* event handlers */
   let keys = new Set();
@@ -126,8 +187,9 @@
   }
 
   function onmousemove(event) {
-    mouse.x = event.clientX * window.devicePixelRatio;
-    mouse.y = event.clientY * window.devicePixelRatio;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (event.clientX - rect.left) * window.devicePixelRatio;
+    mouse.y = (event.clientY - rect.top) * window.devicePixelRatio;
     mouse.dx = mouse.x - mouse.startX;
     mouse.dy = mouse.y - mouse.startY;
 
@@ -147,8 +209,11 @@
   }
 
   function onmousebuttondown(event) {
-    mouse.startX = event.clientX * window.devicePixelRatio;
-    mouse.startY = event.clientY * window.devicePixelRatio;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (event.clientX - rect.left) * window.devicePixelRatio;
+    mouse.y = (event.clientY - rect.top) * window.devicePixelRatio;
+    mouse.startX = mouse.x;
+    mouse.startY = mouse.y;
     mouse.buttons |= (1 << event.button);
 
     if (selectedTool.onmousebuttondown) {
@@ -190,7 +255,67 @@
       onmousebuttondown: () => {},
       onmousebuttonup: () => {},
       onkeyup: () => {},
-      onkeydown: () => {}
+      onkeydown: () => {},
+      onrender: () => {},
+    },
+    {
+      name: '브러시',
+      shortcut: 'b',
+      icon: 'brush',
+      onstart: () => {
+        canvas.style.cursor = 'crosshair';
+        toolVar.brushSize = toolVar.brushSize ? toolVar.brushSize : 0.01;
+      },
+      onend: () => {
+        canvas.style.cursor = 'default';
+      },
+      onmousemove: (e) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+
+        if (toolVar.isDrawing) {
+          const [x0, y0] = camera.screenToWorld(mouse.x, mouse.y);
+          const [x1, y1] = camera.screenToWorld(toolVar.previousMouseX, toolVar.previousMouseY);
+          socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${10}`);
+        }
+
+        toolVar.previousMouseX = mouse.x;
+        toolVar.previousMouseY = mouse.y;
+        render();
+      },
+      onmousebuttondown: (e) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+
+        toolVar.isDrawing = true;
+      },
+      onmousebuttonup: () => {
+        toolVar.isDrawing = false;
+      },
+      onkeyup: (e) => {
+        if (e.key === '[') {
+          toolVar.brushSize *= 0.9;
+        }
+        if (e.key === ']') {
+          toolVar.brushSize *= 1.1;
+        }
+        render();
+      },
+      onkeydown: () => {},
+      onrender: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+
+        ctx.strokeStyle = selectedColor.hex;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, toolVar.brushSize * camera.zoom / window.devicePixelRatio, 0, 2 * Math.PI);
+        ctx.stroke();
+      },
     },
   ];
 
@@ -200,6 +325,7 @@
         selectedTool.onend(toolVar);
       }
       selectedTool = tool;
+      render();
       if (selectedTool.onstart) {
         selectedTool.onstart(toolVar);
       }
@@ -214,7 +340,10 @@
     if (selectedTool.onend) {
       selectedTool.onend(toolVar);
     }
+
     selectedTool = foundTool;
+    render();
+
     if (selectedTool.onstart) {
       selectedTool.onstart(toolVar);
     }
@@ -223,17 +352,6 @@
   selectTool(tools[0]);
 
   /* onMount and onDestroy lifecycle hooks */
-  const protocol = [
-    {
-      prefix: "map",
-      action: (send, args) => {
-        map = mapFromJSON(JSON.parse(args[0]));
-        draw();
-        render();
-      }
-    }
-  ];
-
   onMount(() => {
     /* Initialize canvas */
     canvasContainerDiv = document.querySelector('.canvas-container');
@@ -296,7 +414,13 @@
   <div class="canvas-container">
     <canvas id="canvas"></canvas>
   </div>
-  <div class="properties-container">속성</div>
+  <div class="properties-container">
+    {#if map}
+      {#key mapRender}
+        <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} />
+      {/key}
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -344,8 +468,6 @@
 
   .properties-container {
     width: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 8px;
   }
 </style>
