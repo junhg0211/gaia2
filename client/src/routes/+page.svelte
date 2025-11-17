@@ -192,69 +192,6 @@
       onkeyup: () => {},
       onkeydown: () => {}
     },
-    {
-      name: '패닝',
-      shortcut: 'h',
-      icon: 'arrows-move',
-      onstart: () => {
-        canvas.style.cursor = 'grab';
-      },
-      onend: () => {
-        canvas.style.cursor = 'default';
-      },
-      onmousemove: () => {
-        if (mouse.buttons & 1) {
-          camera.x = toolVar.startCameraX - (mouse.x - toolVar.originalX) / camera.zoom;
-          camera.y = toolVar.startCameraY - (mouse.y - toolVar.originalY) / camera.zoom;
-          render();
-        }
-      },
-      onmousebuttondown: () => {
-        if (mouse.buttons & 1) {
-          toolVar.originalX = mouse.x;
-          toolVar.originalY = mouse.y;
-          toolVar.startCameraX = camera.x;
-          toolVar.startCameraY = camera.y;
-          canvas.style.cursor = 'grabbing';
-        }
-      },
-      onmousebuttonup: () => {
-        canvas.style.cursor = 'grab';
-      },
-      onkeyup: () => {},
-      onkeydown: () => {}
-    },
-    {
-      name: '확대/축소',
-      shortcut: 'z',
-      icon: 'zoom-in',
-      onstart: () => {
-        canvas.style.cursor = 'se-resize';
-      },
-      onend: () => {
-        canvas.style.cursor = 'default';
-      },
-      onmousemove: () => {
-        if (mouse.buttons & 1) {
-          const delta = (mouse.x + mouse.y) - (toolVar.startX + toolVar.startY);
-          const zoomFactor = 1 + (delta) * 0.01;
-          camera.setZoom(toolVar.originalZoom * zoomFactor);
-          render();
-        }
-      },
-      onmousebuttondown: () => {
-        if (mouse.buttons & 1) {
-          toolVar.originalCameraX = camera.x;
-          toolVar.originalCameraY = camera.y;
-          toolVar.originalZoom = camera.zoom;
-          toolVar.startX = mouse.x;
-          toolVar.startY = mouse.y;
-        }
-      },
-      onmousebuttonup: () => {},
-      onkeyup: () => {},
-      onkeydown: () => {}
-    },
   ];
 
   function selectTool(tool) {
@@ -308,9 +245,9 @@
     window.addEventListener('resize', onresize);
     window.addEventListener('keydown', onkeydown);
     window.addEventListener('keyup', onkeyup);
-    window.addEventListener('mousemove', onmousemove);
-    window.addEventListener('mousedown', onmousebuttondown);
-    window.addEventListener('mouseup', onmousebuttonup);
+    canvas.addEventListener('mousemove', onmousemove);
+    canvas.addEventListener('mousedown', onmousebuttondown);
+    canvas.addEventListener('mouseup', onmousebuttonup);
     window.addEventListener('wheel', onwheel);
 
     /* Initialize WebSocket */
