@@ -8,7 +8,7 @@ const host = "0.0.0.0";
 let map = new Map();
 let c = new Color("Red", "red", map.layer)
 map.layer.addColor(c);
-map.layer.quadtree.fillCircle(0.5, 0.5, 0.4, c.id, 6);
+map.layer.quadtree.fillCircle(0.5, 0.5, 0.4, c.id, 12);
 
 const connections = [];
 const commands = [

@@ -11,6 +11,8 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
+      background-color: #2c2c2c;
+      color: white;
     }
   </style>
 </svelte:head>

@@ -34,6 +34,7 @@ export class Quadtree {
     this.value = value;
     this.children = null;
     this.parent = parent;
+    this.image = null;
   }
 
   /* value */
@@ -90,6 +91,13 @@ export class Quadtree {
       this.value = firstValue;
       this.children = null;
     }
+  }
+
+  getDepth() {
+    if (this.isLeaf()) return 0;
+
+    const childDepths = this.children.map(child => child.getDepth());
+    return 1 + Math.max(...childDepths);
   }
 
   /* image representation */
@@ -200,7 +208,51 @@ export class Quadtree {
   }
 
   /* draw on ctx */
-  draw(ctx, camera, canvas, colorMap, x = 0, y = 0, step = 1) {
+  draw(ctx, camera, canvas, colorMap) {
+    const depth = this.getDepth();
+    if (depth > 8) {
+      this.image = null;
+      this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
+      return;
+    } else if (depth !== 8) {
+      this.image = null;
+      return;
+    }
+
+    const imgSize = 1 << depth;
+    const offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = imgSize;
+    offscreenCanvas.height = imgSize;
+    const offscreenCtx = offscreenCanvas.getContext("2d");
+
+    for (let iy = 0; iy < imgSize; iy++) {
+      for (let ix = 0; ix < imgSize; ix++) {
+        const value = this.getValueAt(ix / imgSize, iy / imgSize);
+        const color = colorMap[value];
+        if (color === "transparent") continue;
+
+        offscreenCtx.fillStyle = color;
+        offscreenCtx.fillRect(ix, iy, 1, 1);
+      }
+    }
+
+    this.image = offscreenCanvas;
+    return;
+  }
+
+  render(ctx, camera, canvas, colorMap, x = 0, y = 0, step = 1) {
+    if (this.image) {
+      const [sx, sy] = camera.worldToScreen(x, y);
+      const size = camera.zoom * Math.pow(0.5, step - 1);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.image, sx, sy, size, size);
+      return;
+    }
+
+    if (camera.isBoxOutsideViewbox(x, y, x + Math.pow(0.5, step - 1), y + Math.pow(0.5, step - 1))) {
+      return;
+    }
+
     if (this.isLeaf()) {
       const color = colorMap[this.value];
       if (color === "transparent") return;
@@ -209,13 +261,14 @@ export class Quadtree {
       const [sx, sy] = camera.worldToScreen(x, y);
       const size = camera.zoom * Math.pow(0.5, step - 1);
       ctx.fillRect(sx, sy, size, size);
-    } else {
-      step++;
-      this.getChild(0).draw(ctx, camera, canvas, colorMap, x, y, step);
-      this.getChild(1).draw(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step - 1), y, step);
-      this.getChild(2).draw(ctx, camera, canvas, colorMap, x, y + Math.pow(0.5, step - 1), step);
-      this.getChild(3).draw(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step - 1), y + Math.pow(0.5, step - 1), step);
+      return;
     }
+
+    step++;
+    this.getChild(0).render(ctx, camera, canvas, colorMap, x, y, step);
+    this.getChild(1).render(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step - 1), y, step);
+    this.getChild(2).render(ctx, camera, canvas, colorMap, x, y + Math.pow(0.5, step - 1), step);
+    this.getChild(3).render(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step - 1), y + Math.pow(0.5, step - 1), step);
   }
 
   /* serialization */
@@ -267,14 +320,21 @@ export class Layer {
     return this.colors.some(color => color.id === colorId);
   }
 
-  /* draw on ctx */
-  draw(ctx, camera, canvas) {
+  getColorMap() {
     const colorMap = {};
     for (const color of this.colors) {
       colorMap[color.id] = color.color;
     }
+    return colorMap;
+  }
 
-    this.quadtree.draw(ctx, camera, canvas, colorMap);
+  /* draw on ctx */
+  draw(ctx, camera, canvas) {
+    this.quadtree.draw(ctx, camera, canvas, this.getColorMap());
+  }
+
+  render(ctx, camera, canvas) {
+    this.quadtree.render(ctx, camera, canvas, this.getColorMap());
   }
 
   /* serialization */
@@ -308,6 +368,10 @@ export class Map {
   /* draw on ctx */
   draw(ctx, camera, canvas) {
     this.layer.draw(ctx, camera, canvas);
+  }
+
+  render(ctx, camera, canvas) {
+    this.layer.render(ctx, camera, canvas);
   }
 
   /* serialization */
