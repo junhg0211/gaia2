@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { Map, mapFromJSON } from "../../../dataframe.js";
+  import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
   const wsurl = 'ws://localhost:48829';
@@ -148,6 +149,50 @@
     render();
   }
 
+  /* tools */
+  let selectedTool = {};
+  const toolVar = {};
+  const tools = [
+    {
+      name: 'Cursor',
+      shortcut: 'v',
+      icon: 'cursor',
+      onstart: () => {},
+      onend: () => {},
+      onmousemove: () => {},
+      onmousebuttondown: () => {},
+      onmousebuttonup: () => {},
+      onkeyup: () => {},
+      onkeydown: () => {}
+    }
+  ];
+
+  function selectTool(tool) {
+    if (tool instanceof Object) {
+      if (selectedTool.onend) {
+        selectedTool.onend(toolVar);
+      }
+      selectedTool = tool;
+      if (selectedTool.onstart) {
+        selectedTool.onstart(toolVar);
+      }
+      return;
+    }
+
+    const foundTool = tools.find(t => t.name === tool);
+    if (!foundTool) {
+      return;
+    }
+
+    if (selectedTool.onend) {
+      selectedTool.onend(toolVar);
+    }
+    selectedTool = foundTool;
+    if (selectedTool.onstart) {
+      selectedTool.onstart(toolVar);
+    }
+  }
+
   /* onMount and onDestroy lifecycle hooks */
   const protocol = [
     {
@@ -207,7 +252,17 @@
 </script>
 
 <div class="main-container">
-  <div class="toolbar">툴바</div>
+  <div class="toolbar">
+    {#each tools as tool}
+      <button
+          class="tool-button"
+          disabled={selectedTool.name === tool.name}
+          on:click={() => selectTool(tool)}
+      >
+        <i class="bi bi-{tool.icon}"></i>
+      </button>
+    {/each}
+  </div>
   <div class="canvas-container">
     <canvas id="canvas"></canvas>
   </div>
@@ -221,10 +276,26 @@
   }
 
   .toolbar {
-    width: 60px;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .tool-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    padding: 10px;
+    cursor: pointer;
+  }
+
+  .tool-button:hover {
+    background-color: #333333;
+  }
+
+  .tool-button:disabled {
+    color: #555555;
   }
 
   .canvas-container {
