@@ -88,6 +88,9 @@
 
   let canvasContainerDiv;
   function onresize() {
+    canvas.style.width = `0`;
+    canvas.style.height = `0`;
+
     canvas.style.width = `${canvasContainerDiv.clientWidth}px`;
     canvas.style.height = `${canvasContainerDiv.clientHeight}px`;
     canvas.width = canvasContainerDiv.clientWidth * window.devicePixelRatio;
@@ -97,10 +100,25 @@
 
   function onkeydown(event) {
     keys.add(event.key);
+
+    if (selectedTool.onkeydown) {
+      selectedTool.onkeydown(event, toolVar);
+    }
+
+    for (const tool of tools) {
+      if (event.key === tool.shortcut) {
+        selectTool(tool);
+        break;
+      }
+    }
   }
 
   function onkeyup(event) {
     keys.delete(event.key);
+
+    if (selectedTool.onkeyup) {
+      selectedTool.onkeyup(event, toolVar);
+    }
   }
 
   function onmousemove(event) {
@@ -116,6 +134,10 @@
       mouse.startY = mouse.y;
       render();
     }
+
+    if (selectedTool.onmousemove) {
+      selectedTool.onmousemove(event, toolVar);
+    }
   }
 
   function onmousebuttondown(event) {
@@ -126,6 +148,10 @@
     if (mouse.buttons & 2) {
       canvas.style.cursor = 'grabbing';
     }
+
+    if (selectedTool.onmousebuttondown) {
+      selectedTool.onmousebuttondown(event, toolVar);
+    }
   }
 
   function onmousebuttonup(event) {
@@ -133,6 +159,10 @@
 
     if (!(mouse.buttons & 2)) {
       canvas.style.cursor = 'default';
+    }
+
+    if (selectedTool.onmousebuttonup) {
+      selectedTool.onmousebuttonup(event, toolVar);
     }
   }
 
@@ -157,6 +187,18 @@
       name: 'Cursor',
       shortcut: 'v',
       icon: 'cursor',
+      onstart: () => {},
+      onend: () => {},
+      onmousemove: () => {},
+      onmousebuttondown: () => {},
+      onmousebuttonup: () => {},
+      onkeyup: () => {},
+      onkeydown: () => {}
+    },
+    {
+      name: 'Pan',
+      shortcut: 'h',
+      icon: 'arrows-move',
       onstart: () => {},
       onend: () => {},
       onmousemove: () => {},
@@ -192,6 +234,8 @@
       selectedTool.onstart(toolVar);
     }
   }
+
+  selectTool(tools[0]);
 
   /* onMount and onDestroy lifecycle hooks */
   const protocol = [
@@ -279,6 +323,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-direction: column;
   }
 
   .tool-button {
