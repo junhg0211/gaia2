@@ -207,11 +207,11 @@
 </script>
 
 <div class="main-container">
-  <div class="toolbar">TOOLBAR</div>
+  <div class="toolbar">툴바</div>
   <div class="canvas-container">
     <canvas id="canvas"></canvas>
   </div>
-  <div class="properties-container">Properties</div>
+  <div class="properties-container">속성</div>
 </div>
 
 <style>
