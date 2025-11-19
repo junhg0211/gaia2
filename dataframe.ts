@@ -54,8 +54,10 @@ export class Quadtree {
 
   /* children */
   getChild(index: number) {
-    if (this.children === null)
+    if (this.children === null) {
+      console.log(this);
       throw new Error("Cannot get child of a leaf quadtree node.");
+    }
     return this.children[index];
   }
 
@@ -101,6 +103,65 @@ export class Quadtree {
 
     const childDepths: number[] = this.children.map(child => child.getDepth());
     return 1 + Math.max(...childDepths);
+  }
+
+  expandQuadtrants(x: number, y: number, placeholder: number): [(x: number) => number, (y: number) => number] {
+    if (x >= 0 && x <= 1 && y >= 0 && y <= 1)
+      return [(x: number) => x, (y: number) => y];
+
+    const clone = new Quadtree(this.value, this);
+    clone.children = this.children;
+    this.children = [
+      new Quadtree(placeholder, this),
+      new Quadtree(placeholder, this),
+      new Quadtree(placeholder, this),
+      new Quadtree(placeholder, this),
+    ];
+    this.image = null;
+
+    try {
+      this.subdivide();
+    } catch {}
+
+    let xer: (x: number) => number, yer: (y: number) => number;
+
+    if (x < 0 && y < 1) {
+      this.children[3] = clone;
+      x = (x + 1) / 2;
+      y = (y + 1) / 2;
+      xer = (x: number) => (x + 1) / 2;
+      yer = (y: number) => (y + 1) / 2;
+    }
+
+    if (x > 0 && y < 0) {
+      // ru
+      this.children[2] = clone;
+      x = x / 2;
+      y = (y + 1) / 2;
+      xer = (x: number) => x / 2;
+      yer = (y: number) => (y + 1) / 2;
+    }
+
+    if (x < 1 && y > 1) {
+      // ld
+      this.children[1] = clone;
+      x = (x + 1) / 2;
+      y = y / 2;
+      xer = (x: number) => (x + 1) / 2;
+      yer = (y: number) => y / 2;
+    }
+
+    if (x > 1 && y > 0) {
+      // rd
+      this.children[0] = clone;
+      x = x / 2;
+      y = y / 2;
+      xer = (x: number) => x / 2;
+      yer = (y: number) => y / 2;
+    }
+
+    const [xer2, yer2] = this.expandQuadtrants(x, y, placeholder);
+    return [(x: number) => xer2(xer(x)), (y: number) => yer2(yer(y))];
   }
 
   /* image representation */
@@ -208,19 +269,19 @@ export class Quadtree {
       return this.getValue();
 
     const lux = x * 2, luy = y * 2;
-    const luv = this.children[0].getValueAt(lux, luy);
+    const luv = this.getChild(0).getValueAt(lux, luy);
     if (luv !== null) return luv;
 
     const rux = lux - 1, ruy = luy;
-    const ruv = this.children[1].getValueAt(rux, ruy);
+    const ruv = this.getChild(1).getValueAt(rux, ruy);
     if (ruv !== null) return ruv;
 
     const ldx = lux, ldy = luy - 1;
-    const ldv = this.children[2].getValueAt(ldx, ldy);
+    const ldv = this.getChild(2).getValueAt(ldx, ldy);
     if (ldv !== null) return ldv;
 
     const rdx = lux - 1, rdy = luy - 1;
-    return this.children[3].getValueAt(rdx, rdy);
+    return this.getChild(3).getValueAt(rdx, rdy);
   }
 
   /* draw on ctx */
@@ -302,10 +363,10 @@ export class Quadtree {
       return this.value;
     } else {
       return [
-        this.children[0].toJSON(),
-        this.children[1].toJSON(),
-        this.children[2].toJSON(),
-        this.children[3].toJSON()
+        this.getChild(0).toJSON(),
+        this.getChild(1).toJSON(),
+        this.getChild(2).toJSON(),
+        this.getChild(3).toJSON()
       ];
     }
   }

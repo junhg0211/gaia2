@@ -2,7 +2,7 @@
   import Layer from "$lib/components/Layer.svelte";
   import Camera from "$lib/camera";
   import { onMount, onDestroy } from 'svelte';
-  import { mapFromJSON, Color, Map } from "../../../dataframe";
+  import { mapFromJSON, Color, Map, Layer as LayerClass } from "../../../dataframe";
   import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
@@ -51,6 +51,50 @@
         if (!color) return;
         layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, 10);
         layer.draw(ctx, camera, canvas);
+        render();
+      }
+    },
+    {
+      prefix: 'fillpolygon',
+      action: (_send, args) => {
+        const layerId = parseInt(args[0]);
+        const polygonStr = args[1];
+        const colorId = parseInt(args[2]);
+        const depth = parseInt(args[3]);
+
+        const layer = map!.getLayerById(layerId);
+        if (!layer) return;
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+
+        const polygon: [number, number][] = polygonStr.split(';').map(coordStr => {
+          const [xStr, yStr] = coordStr.split(',');
+          return [parseFloat(xStr), parseFloat(yStr)];
+        });
+
+        layer.quadtree.fillPolygon(polygon, color.id, depth);
+        layer.quadtree.draw(ctx, camera, canvas, layer.getColorMap());
+        render();
+        console.log(map);
+      }
+    },
+    {
+      prefix: 'expand',
+      action: (_send, args) => {
+        const minX = parseFloat(args[0]);
+        const minY = parseFloat(args[1]);
+        const maxX = parseFloat(args[2]);
+        const maxY = parseFloat(args[3]);
+        const placeholder = parseInt(args[4]);
+
+        const expandLayer = (layer: LayerClass) => {
+          layer.quadtree.expandQuadtrants(minX, minY, placeholder);
+          layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
+          for (const child of layer.children) {
+            expandLayer(child);
+          }
+        };
+        expandLayer(map!.layer);
         render();
       }
     },
@@ -217,6 +261,7 @@
     isDrawing: boolean;
     previousMouseX: number;
     previousMouseY: number;
+    polygon: [number, number][];
   };
   type Tool = {
     name: string;
@@ -238,22 +283,71 @@
     brushSize: 0.01,
     isDrawing: false,
     previousMouseX: 0,
-    previousMouseY: 0
+    previousMouseY: 0,
+    polygon: [],
   };
   const tools: Tool[] = [
     {
-      name: '커서',
-      shortcut: 'v',
-      icon: 'cursor',
-      onstart: () => {},
-      onend: () => {},
-      onmousemove: () => {},
-      onmousebuttondown: () => {},
-      onmousebuttonup: () => {},
-      onkeyup: () => {},
-      onkeydown: () => {},
-      onrender: () => {},
-      onkeypress: () => {},
+      name: '영역 채우기',
+      shortcut: 'f',
+      icon: 'feather',
+      onmousebuttondown: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+
+        toolVar.isDrawing = true;
+        toolVar.polygon = [camera.screenToWorld(mouse.x, mouse.y)];
+      },
+      onmousemove: (_e: MouseEvent) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+        if (!toolVar.isDrawing) return;
+
+        const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
+        toolVar.polygon.push([wx, wy]);
+        render();
+      },
+      onmousebuttonup: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+
+        toolVar.isDrawing = false;
+        const layer = map.layer;
+        const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
+        socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${10}`);
+        render();
+      },
+      onrender: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+        if (!toolVar.isDrawing) return;
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const [startX, startY] = camera.worldToScreen(toolVar.polygon[0][0], toolVar.polygon[0][1]);
+        ctx.moveTo(startX, startY);
+        for (let i = 1; i < toolVar.polygon.length; i++) {
+          const [sx, sy] = camera.worldToScreen(toolVar.polygon[i][0], toolVar.polygon[i][1]);
+          ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      },
+      onstart: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'crosshair';
+      },
+      onend: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'default';
+      },
     },
     {
       name: '브러시',
@@ -312,6 +406,20 @@
         ctx.arc(mouse.x, mouse.y, toolVar.brushSize * camera.zoom / window.devicePixelRatio, 0, 2 * Math.PI);
         ctx.stroke();
       },
+    },
+    {
+      name: '커서',
+      shortcut: 'v',
+      icon: 'cursor',
+      onstart: () => {},
+      onend: () => {},
+      onmousemove: () => {},
+      onmousebuttondown: () => {},
+      onmousebuttonup: () => {},
+      onkeyup: () => {},
+      onkeydown: () => {},
+      onrender: () => {},
+      onkeypress: () => {},
     },
   ];
 
