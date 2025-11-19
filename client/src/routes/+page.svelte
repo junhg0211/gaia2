@@ -158,6 +158,10 @@
     selectedTool?.onkeyup?.(event, toolVar);
   }
 
+  function onkeypress(event: KeyboardEvent) {
+    selectedTool?.onkeypress?.(event, toolVar);
+  }
+
   function onmousemove(event: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
     mouse.x = (event.clientX - rect.left) * window.devicePixelRatio;
@@ -168,8 +172,8 @@
     if (mouse.buttons & 2) {
       const deltaX = (mouse.startX - mouse.x) / camera.zoom;
       const deltaY = (mouse.startY - mouse.y) / camera.zoom;
-      camera.x += deltaX;
-      camera.y += deltaY;
+      camera.setX(camera.x + deltaX);
+      camera.setY(camera.y + deltaY);
       mouse.startX = mouse.x;
       mouse.startY = mouse.y;
       render();
@@ -199,11 +203,11 @@
     const normalDelta = event.deltaX + event.deltaY;
     const [dx, dy] = [mouse.x - canvas.width / 2, mouse.y - canvas.height / 2];
     const [mouseWorldX, mouseWorldY] = camera.screenToWorld(mouse.x, mouse.y);
-    camera.x = mouseWorldX;
-    camera.y = mouseWorldY;
+    camera.setX(mouseWorldX);
+    camera.setY(mouseWorldY);
     camera.setZoom(camera.zoom * Math.exp(-normalDelta / 1000));
-    camera.x -= dx / camera.zoom;
-    camera.y -= dy / camera.zoom;
+    camera.setX(camera.x - dx / camera.zoom);
+    camera.setY(camera.y - dy / camera.zoom);
     render();
   }
 
@@ -226,6 +230,7 @@
     onkeyup?: (e: KeyboardEvent, vars: ToolVar) => void;
     onkeydown?: (e: KeyboardEvent, vars: ToolVar) => void;
     onrender?: (ctx: CanvasRenderingContext2D, vars: ToolVar) => void;
+    onkeypress?: (e: KeyboardEvent, vars: ToolVar) => void;
   };
 
   let selectedTool: Tool;
@@ -248,6 +253,7 @@
       onkeyup: () => {},
       onkeydown: () => {},
       onrender: () => {},
+      onkeypress: () => {},
     },
     {
       name: '브러시',
@@ -286,7 +292,7 @@
       onmousebuttonup: () => {
         toolVar.isDrawing = false;
       },
-      onkeyup: (e: KeyboardEvent) => {
+      onkeypress: (e: KeyboardEvent) => {
         if (e.key === '[') {
           toolVar.brushSize *= 0.9;
         }
@@ -295,7 +301,6 @@
         }
         render();
       },
-      onkeydown: () => {},
       onrender: () => {
         if (!ctx) return;
         if (!map) return;
@@ -343,6 +348,7 @@
     window.addEventListener('resize', onresize);
     window.addEventListener('keydown', onkeydown);
     window.addEventListener('keyup', onkeyup);
+    window.addEventListener('keypress', onkeypress);
     canvas.addEventListener('mousemove', onmousemove);
     canvas.addEventListener('mousedown', onmousebuttondown);
     canvas.addEventListener('mouseup', onmousebuttonup);

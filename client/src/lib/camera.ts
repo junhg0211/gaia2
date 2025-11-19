@@ -28,6 +28,14 @@ export default class Camera {
     return (screenX2 < 0 || screenX1 > this.canvas.width || screenY2 < 0 || screenY1 > this.canvas.height);
   }
 
+  setX(x: number) {
+    this.x = Math.max(0, Math.min(1, x));
+  }
+
+  setY(y: number) {
+    this.y = Math.max(0, Math.min(1, y));
+  }
+
   setZoom(zoom: number) {
     this.zoom = Math.max(1000, Math.min(5000000, zoom));
   }
