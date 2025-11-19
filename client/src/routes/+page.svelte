@@ -1,17 +1,21 @@
-<script>
+<script lang="ts">
   import Layer from "$lib/components/Layer.svelte";
   import { onMount, onDestroy } from 'svelte';
-  import { mapFromJSON, Color } from "../../../dataframe.js";
+  import { mapFromJSON, Color, Map } from "../../../dataframe.js";
   import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
   const wsurl = 'ws://localhost:48829';
-  let socket;
+  let socket: WebSocket;
+  type ProtocolCommand = {
+    prefix: string;
+    action: (send: (msg: string) => void, args: string[]) => void;
+  };
 
-  const protocol = [
+  const protocol: ProtocolCommand[] = [
     {
       prefix: "map",
-      action: (send, args) => {
+      action: (_send, args) => {
         map = mapFromJSON(JSON.parse(args[0]));
         selectColor(map.layer.colors[0]);
         draw();
@@ -20,12 +24,12 @@
     },
     {
       prefix: "newcolor",
-      action: (send, args) => {
+      action: (_send, args) => {
         const layerId = parseInt(args[0]);
         const colorName = args[1];
         const colorValue = args[2];
 
-        const layer = map.getLayerById(layerId);
+        const layer = map!.getLayerById(layerId);
         if (!layer) return;
         const newColor = new Color(colorName, colorValue, layer);
         layer.colors.push(newColor);
@@ -34,15 +38,15 @@
     },
     {
       prefix: 'drawline',
-      action: (send, args) => {
+      action: (_send, args) => {
         const x0 = parseFloat(args[0]);
         const y0 = parseFloat(args[1]);
         const x1 = parseFloat(args[2]);
         const y1 = parseFloat(args[3]);
         const brushSize = parseFloat(args[4]);
         const colorId = parseInt(args[5]);
-        const layer = map.layer;
-        const color = map.getColorById(colorId);
+        const layer = map!.layer;
+        const color = map!.getColorById(colorId);
         if (!color) return;
         layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, 10);
         layer.draw();
@@ -52,35 +56,34 @@
   ];
 
   /* canvas setup */
-  let canvas;
-  let ctx;
+  let canvas!: HTMLCanvasElement;
+  let ctx!: CanvasRenderingContext2D;
 
   class Camera {
+    x: number;
+    y: number;
+    zoom: number;
     constructor(x = 0.5, y = 0.5, zoom = 1000) {
       this.x = x;
       this.y = y;
       this.zoom = zoom;
     }
-
-    worldToScreen(worldX, worldY) {
+    worldToScreen(worldX: number, worldY: number): [number, number] {
       const screenX = (worldX - this.x) * this.zoom + canvas.width / 2;
       const screenY = (worldY - this.y) * this.zoom + canvas.height / 2;
       return [screenX, screenY];
     }
-
-    screenToWorld(screenX, screenY) {
+    screenToWorld(screenX: number, screenY: number): [number, number] {
       const worldX = (screenX - canvas.width / 2) / this.zoom + this.x;
       const worldY = (screenY - canvas.height / 2) / this.zoom + this.y;
       return [worldX, worldY];
     }
-
-    isBoxOutsideViewbox(x1, y1, x2, y2) {
+    isBoxOutsideViewbox(x1: number, y1: number, x2: number, y2: number): boolean {
       const [screenX1, screenY1] = this.worldToScreen(x1, y1);
       const [screenX2, screenY2] = this.worldToScreen(x2, y2);
       return (screenX2 < 0 || screenX1 > canvas.width || screenY2 < 0 || screenY1 > canvas.height);
     }
-
-    setZoom(zoom) {
+    setZoom(zoom: number) {
       this.zoom = Math.max(1000, Math.min(5000000, zoom));
     }
   }
@@ -107,14 +110,14 @@
     }
   }
 
-  function draw() {
+  function draw(): void {
     if (!ctx) return;
     if (!map) return;
 
     map.draw(ctx, camera, canvas);
   }
 
-  function render() {
+  function render(): void {
     if (!ctx) return;
 
     /* Clear canvas */
@@ -129,17 +132,15 @@
     /* render grid */
     renderGrid();
 
-    if (selectedTool.onrender) {
-      selectedTool.onrender(ctx, toolVar);
-    }
+    selectedTool?.onrender?.(ctx, toolVar);
   }
 
   /* dataframe render setup */
-  let map = null;
-  let selectedColor = null;
+  let map: Map | null = null;
+  let selectedColor: Color | null = null;
   let mapRender = false;
 
-  function selectColor(color) {
+  function selectColor(color: Color) {
     selectedColor = color;
   }
 
@@ -148,11 +149,11 @@
   }
 
   /* event handlers */
-  let keys = new Set();
-  let mouse = { startX: 0, startY: 0, x: 0, y: 0, buttons: 0 };
+  let keys = new Set<string>();
+  let mouse: { startX: number; startY: number; x: number; y: number; dx: number; dy: number; buttons: number } = { startX: 0, startY: 0, x: 0, y: 0, dx: 0, dy: 0, buttons: 0 };
 
-  let canvasContainerDiv;
-  function onresize() {
+  let canvasContainerDiv!: HTMLDivElement;
+  function onresize(): void {
     canvas.style.width = `0`;
     canvas.style.height = `0`;
 
@@ -163,12 +164,10 @@
     render();
   }
 
-  function onkeydown(event) {
+  function onkeydown(event: KeyboardEvent) {
     keys.add(event.key);
 
-    if (selectedTool.onkeydown) {
-      selectedTool.onkeydown(event, toolVar);
-    }
+    selectedTool?.onkeydown?.(event, toolVar);
 
     for (const tool of tools) {
       if (event.key === tool.shortcut) {
@@ -178,15 +177,13 @@
     }
   }
 
-  function onkeyup(event) {
+  function onkeyup(event: KeyboardEvent) {
     keys.delete(event.key);
 
-    if (selectedTool.onkeyup) {
-      selectedTool.onkeyup(event, toolVar);
-    }
+    selectedTool?.onkeyup?.(event, toolVar);
   }
 
-  function onmousemove(event) {
+  function onmousemove(event: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
     mouse.x = (event.clientX - rect.left) * window.devicePixelRatio;
     mouse.y = (event.clientY - rect.top) * window.devicePixelRatio;
@@ -203,12 +200,10 @@
       render();
     }
 
-    if (selectedTool.onmousemove) {
-      selectedTool.onmousemove(event, toolVar);
-    }
+    selectedTool?.onmousemove?.(event, toolVar);
   }
 
-  function onmousebuttondown(event) {
+  function onmousebuttondown(event: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
     mouse.x = (event.clientX - rect.left) * window.devicePixelRatio;
     mouse.y = (event.clientY - rect.top) * window.devicePixelRatio;
@@ -216,20 +211,16 @@
     mouse.startY = mouse.y;
     mouse.buttons |= (1 << event.button);
 
-    if (selectedTool.onmousebuttondown) {
-      selectedTool.onmousebuttondown(event, toolVar);
-    }
+    selectedTool?.onmousebuttondown?.(event, toolVar);
   }
 
-  function onmousebuttonup(event) {
+  function onmousebuttonup(event: MouseEvent) {
     mouse.buttons &= ~(1 << event.button);
 
-    if (selectedTool.onmousebuttonup) {
-      selectedTool.onmousebuttonup(event, toolVar);
-    }
+    selectedTool?.onmousebuttonup?.(event, toolVar);
   }
 
-  function onwheel(event) {
+  function onwheel(event: WheelEvent) {
     const normalDelta = event.deltaX + event.deltaY;
     const [dx, dy] = [mouse.x - canvas.width / 2, mouse.y - canvas.height / 2];
     const [mouseWorldX, mouseWorldY] = camera.screenToWorld(mouse.x, mouse.y);
@@ -242,9 +233,29 @@
   }
 
   /* tools */
-  let selectedTool = {};
-  const toolVar = {};
-  const tools = [
+  type ToolVar = {
+    brushSize: number;
+    isDrawing: boolean;
+    previousMouseX: number;
+    previousMouseY: number;
+  };
+  type Tool = {
+    name: string;
+    shortcut: string;
+    icon: string;
+    onstart?: (vars: ToolVar) => void;
+    onend?: (vars: ToolVar) => void;
+    onmousemove?: (e: MouseEvent, vars: ToolVar) => void;
+    onmousebuttondown?: (e: MouseEvent, vars: ToolVar) => void;
+    onmousebuttonup?: (e: MouseEvent, vars: ToolVar) => void;
+    onkeyup?: (e: KeyboardEvent, vars: ToolVar) => void;
+    onkeydown?: (e: KeyboardEvent, vars: ToolVar) => void;
+    onrender?: (ctx: CanvasRenderingContext2D, vars: ToolVar) => void;
+  };
+
+  let selectedTool: Tool;
+  const toolVar: ToolVar = { brushSize: 0.01, isDrawing: false, previousMouseX: 0, previousMouseY: 0 };
+  const tools: Tool[] = [
     {
       name: '커서',
       shortcut: 'v',
@@ -269,7 +280,7 @@
       onend: () => {
         canvas.style.cursor = 'default';
       },
-      onmousemove: (e) => {
+      onmousemove: (_e: MouseEvent) => {
         if (!ctx) return;
         if (!map) return;
         if (!selectedColor) return;
@@ -284,7 +295,7 @@
         toolVar.previousMouseY = mouse.y;
         render();
       },
-      onmousebuttondown: (e) => {
+      onmousebuttondown: (e: MouseEvent) => {
         if (e.button !== 0) return;
         if (!ctx) return;
         if (!map) return;
@@ -295,7 +306,7 @@
       onmousebuttonup: () => {
         toolVar.isDrawing = false;
       },
-      onkeyup: (e) => {
+      onkeyup: (e: KeyboardEvent) => {
         if (e.key === '[') {
           toolVar.brushSize *= 0.9;
         }
@@ -310,7 +321,7 @@
         if (!map) return;
         if (!selectedColor) return;
 
-        ctx.strokeStyle = selectedColor.hex;
+        ctx.strokeStyle = selectedColor.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(mouse.x, mouse.y, toolVar.brushSize * camera.zoom / window.devicePixelRatio, 0, 2 * Math.PI);
@@ -319,34 +330,22 @@
     },
   ];
 
-  function selectTool(tool) {
-    if (tool instanceof Object) {
-      if (selectedTool.onend) {
-        selectedTool.onend(toolVar);
-      }
+  function selectTool(tool: Tool | string) {
+    if (typeof tool !== 'string') {
+      selectedTool?.onend?.(toolVar);
       selectedTool = tool;
       render();
-      if (selectedTool.onstart) {
-        selectedTool.onstart(toolVar);
-      }
+      selectedTool?.onstart?.(toolVar);
       return;
     }
 
     const foundTool = tools.find(t => t.name === tool);
-    if (!foundTool) {
-      return;
-    }
+    if (!foundTool) return;
 
-    if (selectedTool.onend) {
-      selectedTool.onend(toolVar);
-    }
-
+    selectedTool?.onend?.(toolVar);
     selectedTool = foundTool;
     render();
-
-    if (selectedTool.onstart) {
-      selectedTool.onstart(toolVar);
-    }
+    selectedTool?.onstart?.(toolVar);
   }
 
   selectTool(tools[0]);
@@ -354,9 +353,9 @@
   /* onMount and onDestroy lifecycle hooks */
   onMount(() => {
     /* Initialize canvas */
-    canvasContainerDiv = document.querySelector('.canvas-container');
-    canvas = document.getElementById('canvas');
-    ctx = canvas.getContext('2d');
+    canvasContainerDiv = document.querySelector('.canvas-container') as HTMLDivElement;
+    canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    ctx = canvas.getContext('2d')!;
     onresize();
 
     /* event handling */
@@ -375,7 +374,7 @@
       socket.send("load");
     });
 
-    socket.addEventListener('message', (event) => {
+    socket.addEventListener('message', (event: MessageEvent<string>) => {
       const data = event.data.split('\t');
       const prefix = data[0];
       const args = data.slice(1);

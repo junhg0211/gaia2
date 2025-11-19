@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* data */
 export class Color {
   constructor(name, color, parent) {

@@ -1,13 +1,15 @@
-<script>
-  export let color;
-  export let selectedColor;
-  export let selectColor;
+<script lang="ts">
+  import type { Color as ColorClass } from '../../../../dataframe.js';
+
+  export let color: ColorClass;
+  export let selectedColor: ColorClass | null;
+  export let selectColor: (c: ColorClass) => void;
 
   function select() {
     selectColor(color);
   }
 
-  function isSelected() {
+  function isSelected(): boolean {
     if (!selectedColor) return false;
 
     return selectedColor.id === color.id;
