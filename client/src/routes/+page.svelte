@@ -73,9 +73,8 @@
         });
 
         layer.quadtree.fillPolygon(polygon, color.id, depth);
-        layer.quadtree.draw(ctx, camera, canvas, layer.getColorMap());
+        layer.draw(ctx, camera, canvas);
         render();
-        console.log(map);
       }
     },
     {
