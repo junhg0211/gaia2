@@ -1,7 +1,8 @@
 <script lang="ts">
   import Layer from "$lib/components/Layer.svelte";
+  import Camera from "$lib/camera";
   import { onMount, onDestroy } from 'svelte';
-  import { mapFromJSON, Color, Map } from "../../../dataframe.js";
+  import { mapFromJSON, Color, Map } from "../../../dataframe";
   import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
@@ -49,7 +50,7 @@
         const color = map!.getColorById(colorId);
         if (!color) return;
         layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, 10);
-        layer.draw();
+        layer.draw(ctx, camera, canvas);
         render();
       }
     },
@@ -59,38 +60,12 @@
   let canvas!: HTMLCanvasElement;
   let ctx!: CanvasRenderingContext2D;
 
-  class Camera {
-    x: number;
-    y: number;
-    zoom: number;
-    constructor(x = 0.5, y = 0.5, zoom = 1000) {
-      this.x = x;
-      this.y = y;
-      this.zoom = zoom;
-    }
-    worldToScreen(worldX: number, worldY: number): [number, number] {
-      const screenX = (worldX - this.x) * this.zoom + canvas.width / 2;
-      const screenY = (worldY - this.y) * this.zoom + canvas.height / 2;
-      return [screenX, screenY];
-    }
-    screenToWorld(screenX: number, screenY: number): [number, number] {
-      const worldX = (screenX - canvas.width / 2) / this.zoom + this.x;
-      const worldY = (screenY - canvas.height / 2) / this.zoom + this.y;
-      return [worldX, worldY];
-    }
-    isBoxOutsideViewbox(x1: number, y1: number, x2: number, y2: number): boolean {
-      const [screenX1, screenY1] = this.worldToScreen(x1, y1);
-      const [screenX2, screenY2] = this.worldToScreen(x2, y2);
-      return (screenX2 < 0 || screenX1 > canvas.width || screenY2 < 0 || screenY1 > canvas.height);
-    }
-    setZoom(zoom: number) {
-      this.zoom = Math.max(1000, Math.min(5000000, zoom));
-    }
-  }
-
-  let camera = new Camera();
+  let camera!: Camera;
 
   function renderGrid() {
+    if (!ctx) return;
+    if (!camera) return;
+
     const gridUnit = 1;
     ctx.strokeStyle = '#777777';
     ctx.lineWidth = 1;
@@ -254,7 +229,12 @@
   };
 
   let selectedTool: Tool;
-  const toolVar: ToolVar = { brushSize: 0.01, isDrawing: false, previousMouseX: 0, previousMouseY: 0 };
+  const toolVar: ToolVar = {
+    brushSize: 0.01,
+    isDrawing: false,
+    previousMouseX: 0,
+    previousMouseY: 0
+  };
   const tools: Tool[] = [
     {
       name: '커서',
@@ -321,7 +301,7 @@
         if (!map) return;
         if (!selectedColor) return;
 
-        ctx.strokeStyle = selectedColor.color;
+        ctx.strokeStyle = 'black';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(mouse.x, mouse.y, toolVar.brushSize * camera.zoom / window.devicePixelRatio, 0, 2 * Math.PI);
@@ -356,6 +336,7 @@
     canvasContainerDiv = document.querySelector('.canvas-container') as HTMLDivElement;
     canvas = document.getElementById('canvas') as HTMLCanvasElement;
     ctx = canvas.getContext('2d')!;
+    camera = new Camera(canvas);
     onresize();
 
     /* event handling */

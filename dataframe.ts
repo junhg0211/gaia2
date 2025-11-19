@@ -1,7 +1,16 @@
-// @ts-nocheck
 /* data */
+interface Camera {
+  worldToScreen(x: number, y: number): [number, number];
+  isBoxOutsideViewbox(x0: number, y0: number, x1: number, y1: number): boolean;
+  zoom: number;
+}
 export class Color {
-  constructor(name, color, parent) {
+  name: string;
+  color: string;
+  parent: any;
+  id: number;
+
+  constructor(name: string, color: string, parent: any) {
     this.name = name;
     this.color = color;
     this.parent = parent;
@@ -9,7 +18,7 @@ export class Color {
   }
 
   /* serialization */
-  toJSON() {
+  toJSON(): any {
     return {
       id: this.id,
       name: this.name,
@@ -18,20 +27,13 @@ export class Color {
   }
 }
 
-function polygonContainsPoint(polygon, x, y) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0], yi = polygon[i][1];
-    const xj = polygon[j][0], yj = polygon[j][1];
-
-    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
 export class Quadtree {
-  constructor(value, parent) {
+  value: number | null;
+  children: Quadtree[] | null;
+  parent: Quadtree | Layer | Map;
+  image: HTMLCanvasElement | null; 
+
+  constructor(value: number | null, parent: Quadtree | Layer | Map) {
     this.value = value;
     this.children = null;
     this.parent = parent;
@@ -39,20 +41,20 @@ export class Quadtree {
   }
 
   /* value */
-  setValue(value) {
+  setValue(value: number) {
     this.value = value;
     this.children = null;
   }
 
-  getValue() {
-    if (this.isDivided())
+  getValue(): number {
+    if (this.value === null)
       throw new Error("Cannot get value of a divided quadtree node.");
     return this.value;
   }
 
   /* children */
-  getChild(index) {
-    if (this.isLeaf())
+  getChild(index: number) {
+    if (this.children === null)
       throw new Error("Cannot get child of a leaf quadtree node.");
     return this.children[index];
   }
@@ -79,7 +81,7 @@ export class Quadtree {
   }
 
   mergeIfPossible() {
-    if (this.isLeaf()) return;
+    if (this.children === null) return;
 
     for (const child of this.children) child.mergeIfPossible();
 
@@ -95,44 +97,53 @@ export class Quadtree {
   }
 
   getDepth() {
-    if (this.isLeaf()) return 0;
+    if (this.children === null) return 0;
 
-    const childDepths = this.children.map(child => child.getDepth());
+    const childDepths: number[] = this.children.map(child => child.getDepth());
     return 1 + Math.max(...childDepths);
   }
 
   /* image representation */
-  fillPolygon(polygon, value, depth) {
+  fillPolygon(polygon: [number, number][], value: number, depth: number) {
+    function polygonContainsPoint(px: number, py: number, polygon: [number, number][]): boolean {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+
+        const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
     if (depth <= 0 || depth === undefined) {
-      const containsCenter = polygonContainsPoint(polygon, 0.5, 0.5);
+      const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
 
       if (containsCenter) return this.setValue(value);
       else return;
     }
 
-    const luIncluded = polygonContainsPoint(polygon, 0, 0);
-    const ruIncluded = polygonContainsPoint(polygon, 1, 0);
-    const ldIncluded = polygonContainsPoint(polygon, 0, 1);
-    const rdIncluded = polygonContainsPoint(polygon, 1, 1);
-    if (luIncluded && ruIncluded && ldIncluded && rdIncluded)
-      return this.setValue(value);
-    if (!(luIncluded || ruIncluded || ldIncluded || rdIncluded)) return;
+    // check if polygon completely outside square
+    const polygonMinX = Math.min(...polygon.map(p => p[0]));
+    const polygonMaxX = Math.max(...polygon.map(p => p[0]));
+    const polygonMinY = Math.min(...polygon.map(p => p[1]));
+    const polygonMaxY = Math.max(...polygon.map(p => p[1]));
+
+    if (polygonMaxX < 0 || polygonMinX > 1 || polygonMaxY < 0 || polygonMinY > 1)
+      return; // polygon completely outside square
 
     this.subdivide();
 
-    const luPolygon = polygon.map(([x, y]) => [x * 0.5, y * 0.5]);
-    const ruPolygon = polygon.map(([x, y]) => [0.5 + x * 0.5, y * 0.5]);
-    const ldPolygon = polygon.map(([x, y]) => [x * 0.5, 0.5 + y * 0.5]);
-    const rdPolygon = polygon.map(([x, y]) => [0.5 + x * 0.5, 0.5 + y * 0.5]);
-    this.children[0].fillPolygon(luPolygon, value, depth - 1);
-    this.children[1].fillPolygon(ruPolygon, value, depth - 1);
-    this.children[2].fillPolygon(ldPolygon, value, depth - 1);
-    this.children[3].fillPolygon(rdPolygon, value, depth - 1);
+    this.getChild(0).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2]), value, depth - 1);
+    this.getChild(1).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2]), value, depth - 1);
+    this.getChild(2).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2 - 1]), value, depth - 1);
+    this.getChild(3).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2 - 1]), value, depth - 1);
 
     this.mergeIfPossible();
   }
 
-  fillCircle(x, y, radius, value, depth) {
+  fillCircle(x: number, y: number, radius: number, value: number, depth: number) {
     if (depth <= 0 || depth === undefined) {
       const distance = Math.hypot(x - 0.5, y - 0.5);
       const containsCenter = distance <= radius;
@@ -159,10 +170,10 @@ export class Quadtree {
     this.mergeIfPossible();
   }
 
-  drawLine(x0, y0, x1, y1, value, width, depth) {
+  drawLine(x0: number, y0: number, x1: number, y1: number, value: number, width: number, depth: number) {
     const theta = Math.atan2(y1 - y0, x1 - x0);
     const halfWidth = width / 2;
-    const corners = [
+    const corners: [number, number][] = [
       [x0 + halfWidth * Math.cos(theta + Math.PI / 2), y0 + halfWidth * Math.sin(theta + Math.PI / 2)],
       [x0 + halfWidth * Math.cos(theta - Math.PI / 2), y0 + halfWidth * Math.sin(theta - Math.PI / 2)],
       [x1 + halfWidth * Math.cos(theta - Math.PI / 2), y1 + halfWidth * Math.sin(theta - Math.PI / 2)],
@@ -173,7 +184,7 @@ export class Quadtree {
     this.fillCircle(x1, y1, halfWidth, value, depth);
   }
 
-  overwrite(otherQuadtree, includeFunction) {
+  overwrite(otherQuadtree: Quadtree, includeFunction: (value: number | null) => boolean) {
     if (otherQuadtree.isLeaf()) {
       if (includeFunction(otherQuadtree.getValue()))
         this.setValue(otherQuadtree.getValue());
@@ -181,15 +192,19 @@ export class Quadtree {
     }
 
     this.subdivide();
+    if (this.children === null)
+      throw new Error("Quadtree children should not be null after subdivision.");
+
     for (let i = 0; i < 4; i++)
       this.children[i].overwrite(otherQuadtree.getChild(i), includeFunction);
+
     this.mergeIfPossible();
   }
 
-  getValueAt(x, y) {
+  getValueAt(x: number, y: number): number | null {
     if (x < 0 || x > 1 || y < 0 || y > 1) return null;
 
-    if (this.isLeaf())
+    if (this.children === null)
       return this.getValue();
 
     const lux = x * 2, luy = y * 2;
@@ -209,10 +224,16 @@ export class Quadtree {
   }
 
   /* draw on ctx */
-  draw(ctx, camera, canvas, colorMap) {
+  draw(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    canvas: HTMLCanvasElement,
+    colorMap: { [key: number]: string }
+  ) {
     const depth = this.getDepth();
     if (depth > 8) {
       this.image = null;
+      if (this.children === null) return;
       this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
       return;
     } else if (depth !== 8) {
@@ -224,12 +245,13 @@ export class Quadtree {
     const offscreenCanvas = document.createElement("canvas");
     offscreenCanvas.width = imgSize;
     offscreenCanvas.height = imgSize;
-    const offscreenCtx = offscreenCanvas.getContext("2d");
+    const offscreenCtx: CanvasRenderingContext2D | null = offscreenCanvas.getContext("2d");
+    if (offscreenCtx === null) return;
 
     for (let iy = 0; iy < imgSize; iy++) {
       for (let ix = 0; ix < imgSize; ix++) {
         const value = this.getValueAt(ix / imgSize, iy / imgSize);
-        const color = colorMap[value];
+        const color = colorMap[value ?? -1];
         if (color === "transparent") continue;
 
         offscreenCtx.fillStyle = color;
@@ -241,7 +263,7 @@ export class Quadtree {
     return;
   }
 
-  render(ctx, camera, canvas, colorMap, x = 0, y = 0, step = 1) {
+  render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement, colorMap: { [key: number]: string }, x = 0, y = 0, step = 1) {
     if (this.image) {
       const [sx, sy] = camera.worldToScreen(x, y);
       const size = camera.zoom * Math.pow(0.5, step - 1);
@@ -255,7 +277,7 @@ export class Quadtree {
     }
 
     if (this.isLeaf()) {
-      const color = colorMap[this.value];
+      const color = colorMap[this.value ?? -1];
       if (color === "transparent") return;
 
       ctx.fillStyle = color;
@@ -273,8 +295,8 @@ export class Quadtree {
   }
 
   /* serialization */
-  toJSON() {
-    if (this.isLeaf()) {
+  toJSON(): any {
+    if (this.children === null) {
       if (this.value === null)
         throw new Error("Cannot serialize a quadtree leaf with null value.");
       return this.value;
@@ -290,7 +312,13 @@ export class Quadtree {
 }
 
 export class Layer {
-  constructor(name, parent) {
+  id: number;
+  name: string;
+  parent: Map | Layer;
+  colors: Color[];
+  children: Layer[];
+  quadtree: Quadtree;
+  constructor(name: string, parent: Map | Layer) {
     this.name = name;
     this.parent = parent;
     this.colors = [new Color("Transparent", "transparent", this)];
@@ -300,29 +328,25 @@ export class Layer {
   }
 
   /* colors */
-  addColor(color) {
+  addColor(color: Color) {
     this.colors.push(color);
   }
 
-  includesColor(colorName) {
-    return this.colors.some(color => color.name === colorName);
-  }
-
   /* children */
-  addChild(layer) {
+  addChild(layer: Layer) {
     this.children.push(layer);
   }
 
-  includesLayer(layerId) {
-    return this.children.some(layer => layer.getId() === layerId);
+  includesLayer(layerId: number): boolean {
+    return this.children.some(layer => layer.id === layerId);
   }
 
-  includesColor(colorId) {
+  includesColor(colorId: number): boolean {
     return this.colors.some(color => color.id === colorId);
   }
 
   getColorMap() {
-    const colorMap = {};
+    const colorMap: { [key: number]: string } = {};
     for (const color of this.colors) {
       colorMap[color.id] = color.color;
     }
@@ -330,16 +354,16 @@ export class Layer {
   }
 
   /* draw on ctx */
-  draw(ctx, camera, canvas) {
+  draw(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.quadtree.draw(ctx, camera, canvas, this.getColorMap());
   }
 
-  render(ctx, camera, canvas) {
+  render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.quadtree.render(ctx, camera, canvas, this.getColorMap());
   }
 
   /* serialization */
-  toJSON() {
+  toJSON(): { id: number; name: string; colors: any[]; quadtree: any; children: any[] } {
     return {
       id: this.id,
       name: this.name,
@@ -351,6 +375,9 @@ export class Layer {
 }
 
 export class Map {
+  nextLayerId: number;
+  nextColorId: number;
+  layer: Layer;
   constructor() {
     this.nextLayerId = 1;
     this.nextColorId = 1;
@@ -366,8 +393,8 @@ export class Map {
     return this.nextColorId++;
   }
 
-  getLayerById(layerId) {
-    function searchLayer(layer, layerId) {
+  getLayerById(layerId: number): Layer | null {
+    function searchLayer(layer: Layer, layerId: number): Layer | null {
       if (layer.id === layerId) return layer;
       for (const childLayer of layer.children) {
         const result = searchLayer(childLayer, layerId);
@@ -378,8 +405,8 @@ export class Map {
     return searchLayer(this.layer, layerId);
   }
 
-  getColorById(colorId) {
-    function searchLayerForColor(layer, colorId) {
+  getColorById(colorId: number): Color | null {
+    function searchLayerForColor(layer: Layer, colorId: number): Color | null {
       for (const color of layer.colors) {
         if (color.id === colorId) return color;
       }
@@ -393,11 +420,11 @@ export class Map {
   }
 
   /* draw on ctx */
-  draw(ctx, camera, canvas) {
+  draw(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.layer.draw(ctx, camera, canvas);
   }
 
-  render(ctx, camera, canvas) {
+  render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.layer.render(ctx, camera, canvas);
   }
 
@@ -411,14 +438,14 @@ export class Map {
   }
 }
 
-function getMap(thing) {
+function getMap(thing: Map | Layer): Map {
   if (thing instanceof Map)
     return thing;
-  return thing.parent;
+  return getMap(thing.parent);
 }
 
 /* deserialization */
-export function mapFromJSON(json) {
+export function mapFromJSON(json: any): Map {
   const map = new Map();
   map.layer = layerFromJSON(json.layer, map);
   map.nextLayerId = json.nextLayerId;
@@ -426,20 +453,20 @@ export function mapFromJSON(json) {
   return map;
 }
 
-function layerFromJSON(json, parent) {
+function layerFromJSON(json: any, parent: Map | Layer): Layer {
   const layer = new Layer(json.name, parent);
   layer.id = json.id;
-  layer.colors = json.colors.map(colorJson => {
+  layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; }) => {
     const color = new Color(colorJson.name, colorJson.color, layer);
     color.id = colorJson.id;
     return color;
   });
   layer.quadtree = quadtreeFromJSON(json.quadtree, layer);
-  layer.children = json.children.map(childJson => layerFromJSON(childJson, layer));
+  layer.children = json.children.map((childJson: any) => layerFromJSON(childJson, layer));
   return layer;
 }
 
-function quadtreeFromJSON(json, parent) {
+function quadtreeFromJSON(json: any, parent: Map | Layer | Quadtree): Quadtree {
   if (Array.isArray(json)) {
     const node = new Quadtree(null, parent);
     node.children = [
