@@ -37,13 +37,29 @@ const commands: Command[] = [
     prefix: 'drawline',
     action: (announce, send, content, args) => {
       let [rawX0, rawY0, rawX1, rawY1, rawBrushSize, rawColorId, rawDepth] = args;
-      const x0 = parseFloat(rawX0);
-      const y0 = parseFloat(rawY0);
-      const x1 = parseFloat(rawX1);
-      const y1 = parseFloat(rawY1);
+      let x0 = parseFloat(rawX0);
+      let y0 = parseFloat(rawY0);
+      let x1 = parseFloat(rawX1);
+      let y1 = parseFloat(rawY1);
       const brushSize = parseFloat(rawBrushSize);
       const colorId = parseInt(rawColorId);
       const depth = parseInt(rawDepth);
+
+      const minX = Math.min(x0, x1) - brushSize / 2;
+      const minY = Math.min(y0, y1) - brushSize / 2;
+      const maxX = Math.max(x0, x1) + brushSize / 2;
+      const maxY = Math.max(y0, y1) + brushSize / 2;
+
+      if (minX < 0 || minY < 0 || maxX > 1 || maxY > 1) {
+        const placeholder = map.layer.colors[0]?.id || 1;
+        const [xer1, yer1] = map.layer.quadtree.expandQuadtrants(minX, minY, placeholder);
+        const [xer2, yer2] = map.layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
+        announce(`expand\t${minX}\t${minY}\t${maxX}\t${maxY}`);
+        x0 = xer2(xer1(x0));
+        y0 = yer2(yer1(y0));
+        x1 = xer2(xer1(x1));
+        y1 = yer2(yer1(y1));
+      }
 
       const color = map.getColorById(colorId);
       if (!color) return;

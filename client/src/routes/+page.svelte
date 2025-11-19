@@ -92,7 +92,9 @@
           const [xer2, yer2] = layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
           camera.setX(xer2(xer1(camera.x)));
           camera.setY(yer2(yer1(camera.y)));
-          camera.setZoom(camera.zoom / (xer2(xer1(1)) - xer2(xer1(0))));
+          const sizeFactor = 1 / (xer2(xer1(1)) - xer2(xer1(0)));
+          camera.setZoom(camera.zoom * sizeFactor);
+          toolVar.brushSize /= sizeFactor;
           for (const child of layer.children) {
             expandLayer(child);
           }
