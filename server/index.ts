@@ -29,8 +29,8 @@ const commands: Command[] = [
       const layer = map.getLayerById(layerId);
       if (!layer) return;
       const color = new Color(colorName, colorValue, layer);
-      layer.addColor(color);
       announce(`newcolor\t${layer.id}\t${colorName}\t${colorValue}`);
+      layer.addColor(color);
     }
   },
   {
@@ -51,10 +51,10 @@ const commands: Command[] = [
       const maxY = Math.max(y0, y1) + brushSize / 2;
 
       if (minX < 0 || minY < 0 || maxX > 1 || maxY > 1) {
+        announce(`expand\t${minX}\t${minY}\t${maxX}\t${maxY}`);
         const placeholder = map.layer.colors[0]?.id || 1;
         const [xer1, yer1] = map.layer.quadtree.expandQuadtrants(minX, minY, placeholder);
         const [xer2, yer2] = map.layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
-        announce(`expand\t${minX}\t${minY}\t${maxX}\t${maxY}`);
         x0 = xer2(xer1(x0));
         y0 = yer2(yer1(y0));
         x1 = xer2(xer1(x1));
@@ -63,8 +63,8 @@ const commands: Command[] = [
 
       const color = map.getColorById(colorId);
       if (!color) return;
-      color.parent.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
       announce(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${brushSize}\t${colorId}\t${depth}`);
+      color.parent.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
     }
   },
   {
@@ -73,7 +73,7 @@ const commands: Command[] = [
       let [rawLayerId, rawPolygon, rawColorId, rawDepth] = args;
       const layerId = parseInt(rawLayerId);
       const colorId = parseInt(rawColorId);
-      const depth = parseInt(rawDepth);
+      let depth = parseInt(rawDepth);
 
       const layer = map.getLayerById(layerId);
       if (!layer) return;
@@ -91,7 +91,8 @@ const commands: Command[] = [
       const minY = Math.min(...polygon.map(([_, y]) => y));
 
       if (minX < 0 || minY < 0 || maxX > 1 || maxY > 1) {
-        const placeholder = map.layer.colors[0]?.id || 1;
+        announce(`expand\t${minX}\t${minY}\t${maxX}\t${maxY}`);
+        const placeholder = layer.colors[0]?.id || 1;
         const expandLayer = (layer: Layer) => {
           const [xer1, yer1] = layer.quadtree.expandQuadtrants(minX, minY, placeholder);
           const [xer2, yer2] = layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
@@ -101,7 +102,7 @@ const commands: Command[] = [
           return [(x: number) => xer2(xer1(x)), (y: number) => yer2(yer1(y))];
         };
         const [xer, yer] = expandLayer(map.layer);
-        announce(`expand\t${minX}\t${minY}\t${maxX}\t${maxY}`);
+        depth += 1 / (xer(1) - xer(0));
 
         for (let i = 0; i < polygon.length; i++) {
           const [x, y] = polygon[i];
@@ -109,9 +110,9 @@ const commands: Command[] = [
         }
       }
 
-      layer.quadtree.fillPolygon(polygon, color.id, depth);
       const polygonString = polygon.map(([x, y]) => `${x},${y}`).join(';');
       announce(`fillpolygon\t${layerId}\t${polygonString}\t${colorId}\t${depth}`);
+      layer.quadtree.fillPolygon(polygon, color.id, depth);
     }
   },
 ]

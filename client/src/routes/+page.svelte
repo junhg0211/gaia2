@@ -324,7 +324,7 @@
         toolVar.isDrawing = false;
         const layer = map.layer;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
-        const depth = Math.log2(camera.zoom);
+        const depth = Math.log2(camera.zoom) - 2;
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
         render();
       },
@@ -374,7 +374,7 @@
         if (toolVar.isDrawing) {
           const [x0, y0] = camera.screenToWorld(mouse.x, mouse.y);
           const [x1, y1] = camera.screenToWorld(toolVar.previousMouseX, toolVar.previousMouseY);
-          const depth = Math.log2(camera.zoom);
+          const depth = Math.log2(camera.zoom) - 2;
           socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${depth}`);
         }
 

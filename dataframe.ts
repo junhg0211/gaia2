@@ -44,6 +44,7 @@ export class Quadtree {
   setValue(value: number) {
     this.value = value;
     this.children = null;
+    this.image = null;
   }
 
   getValue(): number {
@@ -95,6 +96,7 @@ export class Quadtree {
     if (allSame) {
       this.value = firstValue;
       this.children = null;
+      this.image = null;
     }
   }
 
@@ -291,15 +293,11 @@ export class Quadtree {
     canvas: HTMLCanvasElement,
     colorMap: { [key: number]: string }
   ) {
-    const depth = this.getDepth();
-    if (depth > 8) {
+    const depth = Math.min(this.getDepth(), 12);
+    if (depth >= 8) {
       this.image = null;
       if (this.children === null) return;
       this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
-      return;
-    } else if (depth !== 8) {
-      this.image = null;
-      return;
     }
 
     const imgSize = 1 << depth;
@@ -338,8 +336,11 @@ export class Quadtree {
       const size = camera.zoom * Math.pow(0.5, step);
       ctx.imageSmoothingEnabled = false;
       if (size < 1) return;
-      ctx.drawImage(this.image, sx, sy, size, size);
-      return;
+
+      if (size <= canvas.width && size <= canvas.height) {
+        ctx.drawImage(this.image, sx, sy, size, size);
+        return;
+      }
     }
 
     if (camera.isBoxOutsideViewbox(x, y, x + Math.pow(0.5, step), y + Math.pow(0.5, step))) {
