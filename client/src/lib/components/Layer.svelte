@@ -1,14 +1,14 @@
-<script>
-  import Color from './Color.svelte';
+<script lang="ts">
+  import ColorComponent from './Color.svelte';
   import Layer from './Layer.svelte';
   import { Color as ColorClass, Layer as LayerClass } from '../../../../dataframe.js';
   import "bootstrap-icons/font/bootstrap-icons.css";
 
-  export let layer;
-  export let socket;
-  export let selectedColor;
-  export let selectColor;
-  export let rerender;
+  export let layer: LayerClass;
+  export let socket: WebSocket;
+  export let selectedColor: ColorClass | null;
+  export let selectColor: (c: ColorClass) => void;
+  export let rerender: () => void;
 
   function newColor() {
     const colorName = prompt("Enter color name:");
@@ -39,7 +39,7 @@
   </div>
   <div class="layer-colors">
     {#each layer.colors as color}
-      <Color {color} {selectedColor} {selectColor} />
+      <ColorComponent {color} {selectedColor} {selectColor} />
     {/each}
     <div class="color-button">
       <button on:click={newColor}>
@@ -49,7 +49,7 @@
   </div>
   <div class="layer-children">
     {#each layer.children as child}
-      <Layer layer={child} {selectedColor} {selectColor} {rerender} />
+      <Layer layer={child} {socket} {selectedColor} {selectColor} {rerender} />
     {/each}
     <div class="color-button">
       <button on:click={newLayer}>
