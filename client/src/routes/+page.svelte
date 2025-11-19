@@ -46,10 +46,11 @@
         const y1 = parseFloat(args[3]);
         const brushSize = parseFloat(args[4]);
         const colorId = parseInt(args[5]);
+        const depth = parseInt(args[6]);
         const layer = map!.layer;
         const color = map!.getColorById(colorId);
         if (!color) return;
-        layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, 10);
+        layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
         layer.draw(ctx, camera, canvas);
         render();
       }
@@ -321,7 +322,8 @@
         toolVar.isDrawing = false;
         const layer = map.layer;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
-        socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${10}`);
+        const depth = Math.log2(camera.zoom);
+        socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
         render();
       },
       onrender: () => {
@@ -370,7 +372,8 @@
         if (toolVar.isDrawing) {
           const [x0, y0] = camera.screenToWorld(mouse.x, mouse.y);
           const [x1, y1] = camera.screenToWorld(toolVar.previousMouseX, toolVar.previousMouseY);
-          socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${10}`);
+          const depth = Math.log2(camera.zoom);
+          socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${depth}`);
         }
 
         toolVar.previousMouseX = mouse.x;
