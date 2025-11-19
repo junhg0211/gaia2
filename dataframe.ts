@@ -337,6 +337,7 @@ export class Quadtree {
       const [sx, sy] = camera.worldToScreen(x, y);
       const size = camera.zoom * Math.pow(0.5, step);
       ctx.imageSmoothingEnabled = false;
+      if (size < 1) return;
       ctx.drawImage(this.image, sx, sy, size, size);
       return;
     }
@@ -352,6 +353,7 @@ export class Quadtree {
       ctx.fillStyle = color;
       const [sx, sy] = camera.worldToScreen(x, y);
       const size = camera.zoom * Math.pow(0.5, step);
+      if (size < 1) return;
       ctx.fillRect(sx, sy, size, size);
       return;
     }

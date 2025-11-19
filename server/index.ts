@@ -6,9 +6,6 @@ const port = 48829;
 const host = "0.0.0.0";
 
 let map = new Map();
-let c = new Color('red', '#ff0000', map.layer);
-map.layer.addColor(c);
-map.layer.quadtree.fillPolygon([[0.1, 0.1], [0.2, 0.1], [0.1, 0.2], [0.2, 0.2]], c.id, 10);
 
 const connections: WebSocket[] = [];
 type Command = {
