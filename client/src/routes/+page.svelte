@@ -409,6 +409,10 @@
 
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 2;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, toolVar.brushSize * camera.zoom / window.devicePixelRatio, 0, 2 * Math.PI);
+        ctx.fill();
         ctx.beginPath();
         ctx.arc(mouse.x, mouse.y, toolVar.brushSize * camera.zoom / window.devicePixelRatio, 0, 2 * Math.PI);
         ctx.stroke();

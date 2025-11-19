@@ -293,9 +293,9 @@ export class Quadtree {
     canvas: HTMLCanvasElement,
     colorMap: { [key: number]: string }
   ) {
+    this.image = null;
     const depth = Math.min(this.getDepth(), 12);
-    if (depth >= 8) {
-      this.image = null;
+    if (depth >= 12) {
       if (this.children === null) return;
       this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
     }
@@ -307,10 +307,10 @@ export class Quadtree {
     const offscreenCtx: CanvasRenderingContext2D | null = this.image.getContext("2d");
     if (offscreenCtx === null) return;
 
-    offscreenCtx.fillStyle = 'transparent';
-    offscreenCtx.fillRect(0, 0, imgSize, imgSize);
-
+    offscreenCtx.clearRect(0, 0, imgSize, imgSize);
     const drawQuadtree = (node: Quadtree, x: number, y: number, size: number) => {
+      if (size < 1) return;
+
       if (node.isLeaf()) {
         const color = colorMap[node.getValue() ?? -1];
         if (color === "transparent") return;
