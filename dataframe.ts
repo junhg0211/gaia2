@@ -333,13 +333,13 @@ export class Quadtree {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement, colorMap: { [key: number]: string }, x = 0, y = 0, step = 0) {
-    // if (this.image) {
-    //   const [sx, sy] = camera.worldToScreen(x, y);
-    //   const size = camera.zoom * Math.pow(0.5, step);
-    //   ctx.imageSmoothingEnabled = false;
-    //   ctx.drawImage(this.image, sx, sy, size, size);
-    //   return;
-    // }
+    if (this.image) {
+      const [sx, sy] = camera.worldToScreen(x, y);
+      const size = camera.zoom * Math.pow(0.5, step);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.image, sx, sy, size, size);
+      return;
+    }
 
     if (camera.isBoxOutsideViewbox(x, y, x + Math.pow(0.5, step), y + Math.pow(0.5, step))) {
       return;

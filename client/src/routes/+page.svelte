@@ -87,8 +87,11 @@
         const placeholder = parseInt(args[4]);
 
         const expandLayer = (layer: LayerClass) => {
-          layer.quadtree.expandQuadtrants(minX, minY, placeholder);
-          layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
+          const [xer1, yer1] = layer.quadtree.expandQuadtrants(minX, minY, placeholder);
+          const [xer2, yer2] = layer.quadtree.expandQuadtrants(maxX, maxY, placeholder);
+          camera.setX(xer2(xer1(camera.x)));
+          camera.setY(yer2(yer1(camera.y)));
+          camera.setZoom(camera.zoom / (xer2(xer1(1)) - xer2(xer1(0))));
           for (const child of layer.children) {
             expandLayer(child);
           }
