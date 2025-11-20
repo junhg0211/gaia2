@@ -165,32 +165,62 @@ export class Quadtree {
 
   /* image representation */
   fillPolygon(polygon: [number, number][], value: number, depth: number) {
+    const polygonContainsPoint = (px: number, py: number, polygon: [number, number][]) => {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+
+        const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    };
+
     if (depth <= 0 || depth === undefined) {
-      const polygonContainsPoint = (px: number, py: number, polygon: [number, number][]) => {
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-          const xi = polygon[i][0], yi = polygon[i][1];
-          const xj = polygon[j][0], yj = polygon[j][1];
-
-          const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
-          if (intersect) inside = !inside;
-        }
-        return inside;
-      };
-
       const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
 
       if (containsCenter) return this.setValue(value);
       else return;
     }
 
-    const polygonMinX = Math.min(...polygon.map(p => p[0]));
+    /* check if polygon completely contains this quadtree node */
+    const linesIntersect = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number) => { 
+      const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+      if (denom === 0) return false;
+      const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+      const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
+      return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
+    };
+
+    const polygonContainsRect = (polygon: [number, number][]) => {
+      if (!polygonContainsPoint(0, 0, polygon)) return false;
+      if (!polygonContainsPoint(1, 0, polygon)) return false;
+      if (!polygonContainsPoint(0, 1, polygon)) return false;
+      if (!polygonContainsPoint(1, 1, polygon)) return false;
+
+      for (let i = 0; i < polygon.length - 1; i++) {
+        const x0 = polygon[i][0], y0 = polygon[i][1];
+        const x1 = polygon[i + 1][0], y1 = polygon[i + 1][1];
+
+        if (linesIntersect(x0, y0, x1, y1, 0, 0, 1, 0)) return false;
+        if (linesIntersect(x0, y0, x1, y1, 1, 0, 1, 1)) return false;
+        if (linesIntersect(x0, y0, x1, y1, 1, 1, 0, 1)) return false;
+        if (linesIntersect(x0, y0, x1, y1, 0, 1, 0, 0)) return false;
+      }
+
+      return true;
+    };
+
+    if (polygonContainsRect(polygon)) return this.setValue(value);
+
+    /* check if polygon is completely outside this quadtree node */
+    const polygonMinX = Math.min(...polygon.map(p => p[0])); 
     const polygonMaxX = Math.max(...polygon.map(p => p[0]));
     const polygonMinY = Math.min(...polygon.map(p => p[1]));
     const polygonMaxY = Math.max(...polygon.map(p => p[1]));
 
-    if (polygonMaxX < 0 || polygonMinX > 1 || polygonMaxY < 0 || polygonMinY > 1)
-      return;
+    if (polygonMaxX <= 0 || polygonMinX >= 1 || polygonMaxY <= 0 || polygonMinY >= 1) return;
 
     this.subdivide();
 
@@ -211,12 +241,23 @@ export class Quadtree {
       else return;
     }
 
+    /* check if circle is completely outside this quadtree node */
     const closestX = Math.max(0, Math.min(1, x));
     const closestY = Math.max(0, Math.min(1, y));
     const distance = Math.hypot(closestX - x, closestY - y);
 
     if (distance >= radius)
       return;
+
+    /* check if circle completely contains this quadtree node */
+    const minDistance = Math.min(
+      Math.hypot(x - 0, y - 0),
+      Math.hypot(x - 1, y - 0),
+      Math.hypot(x - 0, y - 1),
+      Math.hypot(x - 1, y - 1)
+    );
+
+    if (minDistance <= radius) return this.setValue(value);
 
     this.subdivide();
 
