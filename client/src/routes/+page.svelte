@@ -208,7 +208,7 @@
     /* render grid */
     renderGrid();
 
-    selectedTool?.onrender?.(ctx, toolVar);
+    selectedTool?.onrender?.(ctx);
   }
 
   /* dataframe render setup */
@@ -243,7 +243,7 @@
   function onkeydown(event: KeyboardEvent) {
     keys.add(event.key);
 
-    selectedTool?.onkeydown?.(event, toolVar);
+    selectedTool?.onkeydown?.(event);
 
     for (const tool of tools) {
       if (event.key === tool.shortcut) {
@@ -256,11 +256,11 @@
   function onkeyup(event: KeyboardEvent) {
     keys.delete(event.key);
 
-    selectedTool?.onkeyup?.(event, toolVar);
+    selectedTool?.onkeyup?.(event);
   }
 
   function onkeypress(event: KeyboardEvent) {
-    selectedTool?.onkeypress?.(event, toolVar);
+    selectedTool?.onkeypress?.(event);
   }
 
   function onmousemove(event: MouseEvent) {
@@ -280,7 +280,7 @@
       render();
     }
 
-    selectedTool?.onmousemove?.(event, toolVar);
+    selectedTool?.onmousemove?.(event);
   }
 
   function onmousebuttondown(event: MouseEvent) {
@@ -291,13 +291,13 @@
     mouse.startY = mouse.y;
     mouse.buttons |= (1 << event.button);
 
-    selectedTool?.onmousebuttondown?.(event, toolVar);
+    selectedTool?.onmousebuttondown?.(event);
   }
 
   function onmousebuttonup(event: MouseEvent) {
     mouse.buttons &= ~(1 << event.button);
 
-    selectedTool?.onmousebuttonup?.(event, toolVar);
+    selectedTool?.onmousebuttonup?.(event);
   }
 
   function onwheel(event: WheelEvent) {
@@ -323,37 +323,109 @@
   }
 
   /* tools */
+  type Tool = {
+    name: string;
+    shortcut: string;
+    icon: string;
+    onstart?: () => void;
+    onend?: () => void;
+    onmousemove?: (e: MouseEvent) => void;
+    onmousebuttondown?: (e: MouseEvent) => void;
+    onmousebuttonup?: (e: MouseEvent) => void;
+    onkeyup?: (e: KeyboardEvent) => void;
+    onkeydown?: (e: KeyboardEvent) => void;
+    onrender?: (ctx: CanvasRenderingContext2D) => void;
+    onkeypress?: (e: KeyboardEvent) => void;
+  };
+
+  let selectedTool: Tool;
   type ToolVar = {
     brushSize: number;
     isDrawing: boolean;
     previousMouseX: number;
     previousMouseY: number;
     polygon: [number, number][];
+    startX: number;
+    startY: number;
+    mouseX: number;
+    mouseY: number;
   };
-  type Tool = {
-    name: string;
-    shortcut: string;
-    icon: string;
-    onstart?: (vars: ToolVar) => void;
-    onend?: (vars: ToolVar) => void;
-    onmousemove?: (e: MouseEvent, vars: ToolVar) => void;
-    onmousebuttondown?: (e: MouseEvent, vars: ToolVar) => void;
-    onmousebuttonup?: (e: MouseEvent, vars: ToolVar) => void;
-    onkeyup?: (e: KeyboardEvent, vars: ToolVar) => void;
-    onkeydown?: (e: KeyboardEvent, vars: ToolVar) => void;
-    onrender?: (ctx: CanvasRenderingContext2D, vars: ToolVar) => void;
-    onkeypress?: (e: KeyboardEvent, vars: ToolVar) => void;
-  };
-
-  let selectedTool: Tool;
   const toolVar: ToolVar = {
     brushSize: 0.01,
     isDrawing: false,
     previousMouseX: 0,
     previousMouseY: 0,
     polygon: [],
+    startX: 0,
+    startY: 0,
+    mouseX: 0,
+    mouseY: 0,
   };
   const tools: Tool[] = [
+    {
+      name: '자',
+      shortcut: 'r',
+      icon: 'arrows',
+      onstart: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'crosshair';
+        toolVar.startX = 0;
+        toolVar.startY = 0;
+        toolVar.mouseX = 0;
+        toolVar.mouseY = 0;
+        render();
+      }, 
+      onend: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'default';
+        render();
+      },
+      onmousebuttondown: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+
+        toolVar.isDrawing = true;
+        [toolVar.startX, toolVar.startY] = camera.screenToWorld(mouse.x, mouse.y);
+      },
+      onmousemove: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!toolVar.isDrawing) return;
+
+        [toolVar.mouseX, toolVar.mouseY] = camera.screenToWorld(mouse.x, mouse.y);
+        render();
+      },
+      onrender: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (toolVar.startX === 0 && toolVar.startY === 0 && toolVar.mouseX === 0 && toolVar.mouseY === 0) return;
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const [startX, startY] = camera.worldToScreen(toolVar.startX, toolVar.startY);
+        const [endX, endY] = camera.worldToScreen(toolVar.mouseX, toolVar.mouseY);
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        const dist = Math.hypot(toolVar.startX - toolVar.mouseX, toolVar.startY - toolVar.mouseY);
+        const midScreenX = (startX + endX) / 2;
+        const midScreenY = (startY + endY) / 2;
+        ctx.fillStyle = 'white';
+        ctx.font = '16px Arial';
+        ctx.fillText(dist.toFixed(2), midScreenX + 5, midScreenY - 5);
+      },
+      onmousebuttonup: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+
+        toolVar.isDrawing = false;
+        render();
+      },
+    },
     {
       name: '영역 채우기',
       shortcut: 'f',
@@ -498,20 +570,20 @@
 
   function selectTool(tool: Tool | string) {
     if (typeof tool !== 'string') {
-      selectedTool?.onend?.(toolVar);
+      selectedTool?.onend?.();
       selectedTool = tool;
       render();
-      selectedTool?.onstart?.(toolVar);
+      selectedTool?.onstart?.();
       return;
     }
 
     const foundTool = tools.find(t => t.name === tool);
     if (!foundTool) return;
 
-    selectedTool?.onend?.(toolVar);
+    selectedTool?.onend?.();
     selectedTool = foundTool;
     render();
-    selectedTool?.onstart?.(toolVar);
+    selectedTool?.onstart?.();
   }
 
   selectTool(tools[tools.length - 1]);
