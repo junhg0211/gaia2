@@ -13,8 +13,11 @@
   function renameColor() {
     const newName = prompt("Enter new color name:", color.name);
     if (!newName) return;
+    const newColor = prompt("Enter new color value (hex):", color.color);
+    if (!newColor) return;
 
     socket.send(`renamecolor\t${color.id}\t${newName}`);
+    socket.send(`changecolor\t${color.id}\t${newColor}`);
   }
 
   function isSelected(): boolean {

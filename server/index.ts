@@ -136,8 +136,20 @@ const commands: Command[] = [
 
       const color = map.getColorById(colorId);
       if (!color) return;
-      color.name = newName;
       announce(`renamecolor\t${colorId}\t${newName}`);
+      color.name = newName;
+    }
+  },
+  {
+    prefix: 'changecolor',
+    action: (announce, send, content, args) => {
+      let [rawColorId, newColorValue] = args;
+      const colorId = parseInt(rawColorId);
+
+      const color = map.getColorById(colorId);
+      if (!color) return;
+      announce(`changecolor\t${colorId}\t${newColorValue}`);
+      color.color = newColorValue;
     }
   }
 ]

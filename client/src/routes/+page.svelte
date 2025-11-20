@@ -126,6 +126,17 @@
         color.name = newName;
         rerender();
       }
+    },
+    {
+      prefix: 'changecolor',
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const newColorValue = args[1];
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        color.color = newColorValue;
+        rerender();
+      }
     }
   ];
 
