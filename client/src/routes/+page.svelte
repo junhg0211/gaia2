@@ -249,14 +249,24 @@
   }
 
   function onwheel(event: WheelEvent) {
-    const normalDelta = event.deltaX + event.deltaY;
-    const [dx, dy] = [mouse.x - canvas.width / 2, mouse.y - canvas.height / 2];
-    const [mouseWorldX, mouseWorldY] = camera.screenToWorld(mouse.x, mouse.y);
-    camera.setX(mouseWorldX);
-    camera.setY(mouseWorldY);
-    camera.setZoom(camera.zoom * Math.exp(-normalDelta / 1000));
-    camera.setX(camera.x - dx / camera.zoom);
-    camera.setY(camera.y - dy / camera.zoom);
+    if (!ctx) return;
+    if (!camera) return;
+
+    if (keys.has("Alt")) {
+      const normalDelta = event.deltaX + event.deltaY;
+      const [dx, dy] = [mouse.x - canvas.width / 2, mouse.y - canvas.height / 2];
+      const [mouseWorldX, mouseWorldY] = camera.screenToWorld(mouse.x, mouse.y);
+      camera.setX(mouseWorldX);
+      camera.setY(mouseWorldY);
+      camera.setZoom(camera.zoom * Math.exp(-normalDelta / 1000));
+      camera.setX(camera.x - dx / camera.zoom);
+      camera.setY(camera.y - dy / camera.zoom);
+      render();
+      return;
+    }
+
+    camera.setX(camera.x + event.deltaX / camera.zoom);
+    camera.setY(camera.y + event.deltaY / camera.zoom);
     render();
   }
 
@@ -452,7 +462,7 @@
     selectedTool?.onstart?.(toolVar);
   }
 
-  selectTool(tools[0]);
+  selectTool(tools[tools.length - 1]);
 
   /* onMount and onDestroy lifecycle hooks */
   onMount(() => {
@@ -505,7 +515,7 @@
 
 <div class="main-container">
   <div class="toolbar">
-    {#each tools as tool}
+    {#each tools.toReversed() as tool}
       <button
           class="tool-button"
           disabled={selectedTool.name === tool.name}
