@@ -75,10 +75,10 @@ export class Quadtree {
     if (this.isDivided()) return;
 
     this.children = [
-      new Quadtree(this.value, this), // top-left
-      new Quadtree(this.value, this), // top-right
-      new Quadtree(this.value, this), // bottom-left
-      new Quadtree(this.value, this)  // bottom-right
+      new Quadtree(this.value, this),
+      new Quadtree(this.value, this),
+      new Quadtree(this.value, this),
+      new Quadtree(this.value, this)
     ];
     this.value = null;
   }
@@ -136,7 +136,6 @@ export class Quadtree {
     }
 
     if (x > 0 && y < 0) {
-      // ru
       this.children[2] = clone;
       x = x / 2;
       y = (y + 1) / 2;
@@ -145,7 +144,6 @@ export class Quadtree {
     }
 
     if (x < 1 && y > 1) {
-      // ld
       this.children[1] = clone;
       x = (x + 1) / 2;
       y = y / 2;
@@ -154,7 +152,6 @@ export class Quadtree {
     }
 
     if (x > 1 && y > 0) {
-      // rd
       this.children[0] = clone;
       x = x / 2;
       y = y / 2;
@@ -187,14 +184,13 @@ export class Quadtree {
       else return;
     }
 
-    // check if polygon completely outside square
     const polygonMinX = Math.min(...polygon.map(p => p[0]));
     const polygonMaxX = Math.max(...polygon.map(p => p[0]));
     const polygonMinY = Math.min(...polygon.map(p => p[1]));
     const polygonMaxY = Math.max(...polygon.map(p => p[1]));
 
     if (polygonMaxX < 0 || polygonMinX > 1 || polygonMaxY < 0 || polygonMinY > 1)
-      return; // polygon completely outside square
+      return;
 
     this.subdivide();
 
@@ -215,20 +211,19 @@ export class Quadtree {
       else return;
     }
 
-    // closest point in square to circle center
     const closestX = Math.max(0, Math.min(1, x));
     const closestY = Math.max(0, Math.min(1, y));
     const distance = Math.hypot(closestX - x, closestY - y);
 
     if (distance >= radius)
-      return; // circle does not intersect square
+      return;
 
     this.subdivide();
 
-    this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, value, depth - 1);         // top-left
-    this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, value, depth - 1);     // top-right
-    this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, value, depth - 1);     // bottom-left
-    this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, value, depth - 1); // bottom-right
+    this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, value, depth - 1);
+    this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, value, depth - 1);
+    this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, value, depth - 1);
+    this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, value, depth - 1);
 
     this.mergeIfPossible();
   }
@@ -293,11 +288,12 @@ export class Quadtree {
     canvas: HTMLCanvasElement,
     colorMap: { [key: number]: string }
   ) {
-    this.image = null;
+    if (this.children === null) return;
     const depth = Math.min(this.getDepth(), 12);
-    if (depth >= 12) {
-      this.children!.forEach(child => child.draw(ctx, camera, canvas, colorMap));
-    }
+    this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
+    this.image = null;
+
+    if (depth >= 12) return;
 
     const imgSize = 1 << depth;
     this.image = document.createElement("canvas");
@@ -329,16 +325,16 @@ export class Quadtree {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement, colorMap: { [key: number]: string }, x = 0, y = 0, step = 0) {
-    // if (this.image) {
-    //   const [sx, sy] = camera.worldToScreen(x, y);
-    //   const size = camera.zoom * Math.pow(0.5, step);
-    //   ctx.imageSmoothingEnabled = false;
-    //   if (size < 1) return;
-    //   if (size <= canvas.width && size <= canvas.height) {
-    //     ctx.drawImage(this.image, sx, sy, size, size);
-    //     return;
-    //   }
-    // }
+    if (this.image) {
+      const [sx, sy] = camera.worldToScreen(x, y);
+      const size = camera.zoom * Math.pow(0.5, step);
+      ctx.imageSmoothingEnabled = false;
+      if (size <= 1) return;
+      if (size <= canvas.width && size <= canvas.height) {
+        ctx.drawImage(this.image, sx, sy, size, size);
+        return;
+      }
+    }
 
     if (camera.isBoxOutsideViewbox(x, y, x + Math.pow(0.5, step), y + Math.pow(0.5, step))) {
       return;
@@ -429,6 +425,9 @@ export class Layer {
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.quadtree.render(ctx, camera, canvas, this.getColorMap());
+    for (const child of this.children) {
+      child.render(ctx, camera, canvas);
+    }
   }
 
   /* serialization */

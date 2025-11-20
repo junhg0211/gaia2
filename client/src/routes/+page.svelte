@@ -38,6 +38,19 @@
       }
     },
     {
+      prefix: "newlayer",
+      action: (_send, args) => {
+        const parentLayerId = parseInt(args[0]);
+        const layerName = args[1];
+
+        const parentLayer = map!.getLayerById(parentLayerId);
+        if (!parentLayer) return;
+        const newLayer = new LayerClass(layerName, parentLayer);
+        parentLayer.children.push(newLayer);
+        rerender();
+      }
+    },
+    {
       prefix: 'drawline',
       action: (_send, args) => {
         const x0 = parseFloat(args[0]);
@@ -103,6 +116,17 @@
         render();
       }
     },
+    {
+      prefix: 'renamecolor',
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const newName = args[1];
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        color.name = newName;
+        rerender();
+      }
+    }
   ];
 
   /* canvas setup */
@@ -332,7 +356,7 @@
         if (!selectedColor) return;
 
         toolVar.isDrawing = false;
-        const layer = map.layer;
+        const layer = selectedColor.parent;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
         const depth = Math.log2(camera.zoom * window.devicePixelRatio);
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
@@ -471,6 +495,7 @@
     canvas = document.getElementById('canvas') as HTMLCanvasElement;
     ctx = canvas.getContext('2d')!;
     camera = new Camera(canvas);
+    draw();
     onresize();
 
     /* event handling */

@@ -34,6 +34,19 @@ const commands: Command[] = [
     }
   },
   {
+    prefix: 'newlayer',
+    action: (announce, send, content, args) => {
+      let [rawParentLayerId, layerName] = args;
+      const parentLayerId = parseInt(rawParentLayerId);
+
+      const parentLayer = map.getLayerById(parentLayerId);
+      if (!parentLayer) return;
+      const newLayer = new Layer(layerName, parentLayer);
+      announce(`newlayer\t${parentLayer.id}\t${layerName}`);
+      parentLayer.children.push(newLayer);
+    }
+  },
+  {
     prefix: 'drawline',
     action: (announce, send, content, args) => {
       let [rawX0, rawY0, rawX1, rawY1, rawBrushSize, rawColorId, rawDepth] = args;
@@ -115,6 +128,18 @@ const commands: Command[] = [
       layer.quadtree.fillPolygon(polygon, color.id, depth);
     }
   },
+  {
+    prefix: 'renamecolor',
+    action: (announce, send, content, args) => {
+      let [rawColorId, newName] = args;
+      const colorId = parseInt(rawColorId);
+
+      const color = map.getColorById(colorId);
+      if (!color) return;
+      color.name = newName;
+      announce(`renamecolor\t${colorId}\t${newName}`);
+    }
+  }
 ]
 
 function announce(message: string): void {

@@ -1,12 +1,20 @@
 <script lang="ts">
   import type { Color as ColorClass } from '../../../../dataframe.js';
 
+  export let socket: WebSocket;
   export let color: ColorClass;
   export let selectedColor: ColorClass | null;
   export let selectColor: (c: ColorClass) => void;
 
   function select() {
     selectColor(color);
+  }
+
+  function renameColor() {
+    const newName = prompt("Enter new color name:", color.name);
+    if (!newName) return;
+
+    socket.send(`renamecolor\t${color.id}\t${newName}`);
   }
 
   function isSelected(): boolean {
@@ -22,7 +30,7 @@
   class:selected={isSelected()}
 >
   <div class="color-name">
-    <button on:click={select}>{color.name}</button>
+    <button on:click={select} on:dblclick={renameColor}>{color.name}</button>
   </div>
 </div>
 

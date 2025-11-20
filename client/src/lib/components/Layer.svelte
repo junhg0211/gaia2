@@ -13,23 +13,15 @@
   function newColor() {
     const colorName = prompt("Enter color name:");
     if (!colorName) return;
-
     const colorValue = prompt("Enter color value (hex):", "#ffffff");
     if (!colorValue) return;
-
     socket.send(`newcolor\t${layer.id}\t${colorName}\t${colorValue}`);
-
-    rerender();
   }
 
   function newLayer() {
     const layerName = prompt("Enter layer name:");
     if (!layerName) return;
-
-    const newLayer = new LayerClass(layerName, layer);
-    layer.children.push(newLayer);
-
-    rerender();
+    socket.send(`newlayer\t${layer.id}\t${layerName}`);
   }
 </script>
 
@@ -39,7 +31,7 @@
   </div>
   <div class="layer-colors">
     {#each layer.colors as color}
-      <ColorComponent {color} {selectedColor} {selectColor} />
+      <ColorComponent {socket} {color} {selectedColor} {selectColor} />
     {/each}
     <div class="color-button">
       <button on:click={newColor}>
