@@ -168,19 +168,19 @@ export class Quadtree {
 
   /* image representation */
   fillPolygon(polygon: [number, number][], value: number, depth: number) {
-    function polygonContainsPoint(px: number, py: number, polygon: [number, number][]): boolean {
-      let inside = false;
-      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1];
-        const xj = polygon[j][0], yj = polygon[j][1];
-
-        const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
-    }
-
     if (depth <= 0 || depth === undefined) {
+      const polygonContainsPoint = (px: number, py: number, polygon: [number, number][]) => {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+          const xi = polygon[i][0], yi = polygon[i][1];
+          const xj = polygon[j][0], yj = polygon[j][1];
+
+          const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      };
+
       const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
 
       if (containsCenter) return this.setValue(value);
@@ -296,16 +296,14 @@ export class Quadtree {
     this.image = null;
     const depth = Math.min(this.getDepth(), 12);
     if (depth >= 12) {
-      if (this.children === null) return;
-      this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
+      this.children!.forEach(child => child.draw(ctx, camera, canvas, colorMap));
     }
 
     const imgSize = 1 << depth;
     this.image = document.createElement("canvas");
     this.image.width = imgSize;
     this.image.height = imgSize;
-    const offscreenCtx: CanvasRenderingContext2D | null = this.image.getContext("2d");
-    if (offscreenCtx === null) return;
+    const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
 
     offscreenCtx.clearRect(0, 0, imgSize, imgSize);
     const drawQuadtree = (node: Quadtree, x: number, y: number, size: number) => {
@@ -331,17 +329,16 @@ export class Quadtree {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement, colorMap: { [key: number]: string }, x = 0, y = 0, step = 0) {
-    if (this.image) {
-      const [sx, sy] = camera.worldToScreen(x, y);
-      const size = camera.zoom * Math.pow(0.5, step);
-      ctx.imageSmoothingEnabled = false;
-      if (size < 1) return;
-
-      if (size <= canvas.width && size <= canvas.height) {
-        ctx.drawImage(this.image, sx, sy, size, size);
-        return;
-      }
-    }
+    // if (this.image) {
+    //   const [sx, sy] = camera.worldToScreen(x, y);
+    //   const size = camera.zoom * Math.pow(0.5, step);
+    //   ctx.imageSmoothingEnabled = false;
+    //   if (size < 1) return;
+    //   if (size <= canvas.width && size <= canvas.height) {
+    //     ctx.drawImage(this.image, sx, sy, size, size);
+    //     return;
+    //   }
+    // }
 
     if (camera.isBoxOutsideViewbox(x, y, x + Math.pow(0.5, step), y + Math.pow(0.5, step))) {
       return;
@@ -353,7 +350,7 @@ export class Quadtree {
 
       ctx.fillStyle = color;
       const [sx, sy] = camera.worldToScreen(x, y);
-      const size = camera.zoom * Math.pow(0.5, step);
+      const size = camera.zoom * Math.pow(0.5, step) + 1;
       if (size < 1) return;
       ctx.fillRect(sx, sy, size, size);
       return;
