@@ -86,6 +86,7 @@
           return [parseFloat(xStr), parseFloat(yStr)];
         });
 
+        console.log("Helo");
         layer.quadtree.fillPolygon(polygon, color.id, depth);
         layer.draw(ctx, camera, canvas);
         render();
@@ -135,6 +136,18 @@
         const color = map!.getColorById(colorId);
         if (!color) return;
         color.color = newColorValue;
+        rerender();
+      }
+    },
+    {
+      prefix: 'removecolor',
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        const parentLayer: LayerClass = color.parent;
+        parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
+        parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
         rerender();
       }
     }
@@ -568,7 +581,7 @@
   <div class="properties-container">
     {#if map}
       {#key mapRender}
-        <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} />
+        <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} {render} />
       {/key}
     {/if}
   </div>

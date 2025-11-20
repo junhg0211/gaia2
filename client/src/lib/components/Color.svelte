@@ -1,23 +1,30 @@
 <script lang="ts">
   import type { Color as ColorClass } from '../../../../dataframe.js';
+  import "bootstrap-icons/font/bootstrap-icons.css";
 
   export let socket: WebSocket;
   export let color: ColorClass;
   export let selectedColor: ColorClass | null;
   export let selectColor: (c: ColorClass) => void;
+  export let removeable: boolean = true;
 
   function select() {
     selectColor(color);
   }
 
   function renameColor() {
-    const newName = prompt("Enter new color name:", color.name);
+    const newName = prompt("새로운 색상 이름을 입력하세요:", color.name);
     if (!newName) return;
-    const newColor = prompt("Enter new color value (hex):", color.color);
+    const newColor = prompt("새로운 색상 값(헥스)을 입력하세요:", color.color);
     if (!newColor) return;
 
     socket.send(`renamecolor\t${color.id}\t${newName}`);
     socket.send(`changecolor\t${color.id}\t${newColor}`);
+  }
+
+  function removeColor() {
+    if (!confirm(`정말로 색상 "${color.name}"을 삭제하시겠습니까?`)) return;
+    socket.send(`removecolor\t${color.id}`);
   }
 
   function isSelected(): boolean {
@@ -29,18 +36,25 @@
 
 <div
   class="color-item"
-  style="border-left-color: {color.color};"
   class:selected={isSelected()}
 >
   <div class="color-name">
-    <button on:click={select} on:dblclick={renameColor}>{color.name}</button>
+    <button on:click={select} on:dblclick={renameColor} class="color-button">
+      <span style="color: {color.color};">&#x25CF;</span>
+      {color.name}
+    </button>
+    {#if removeable}
+      <button on:click={removeColor} class="delete-button" aria-label="rename">
+        <i class="bi bi-trash"></i>
+      </button>
+    {/if}
   </div>
 </div>
 
 <style>
   .color-item {
     margin: 4px 0;
-    padding: 0 8px;
+    padding-left: 8px;
     border-left: 4px solid #666666;
   }
 
@@ -53,6 +67,13 @@
     border: none;
     color: white;
     cursor: pointer;
+  }
+
+  .color-button {
     font-size: 14px;
+  }
+
+  .delete-button {
+    float: right;
   }
 </style>

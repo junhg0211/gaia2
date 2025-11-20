@@ -1,3 +1,5 @@
+import { off } from "process";
+
 /* data */
 interface Camera {
   worldToScreen(x: number, y: number): [number, number];
@@ -322,6 +324,21 @@ export class Quadtree {
     return this.getChild(3).getValueAt(rdx, rdy);
   }
 
+  removeColor(colorId: number, placeholder: number) {
+    if (this.isLeaf()) {
+      if (this.getValue() === colorId) {
+        this.setValue(placeholder);
+      }
+      return;
+    }
+
+    for (const child of this.children!) {
+      child.removeColor(colorId, placeholder);
+    }
+
+    this.mergeIfPossible();
+  }
+
   /* draw on ctx */
   draw(
     ctx: CanvasRenderingContext2D,
@@ -329,40 +346,31 @@ export class Quadtree {
     canvas: HTMLCanvasElement,
     colorMap: { [key: number]: string }
   ) {
-    if (this.children === null) return;
     const depth = Math.min(this.getDepth(), 12);
-    this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
+
+    if (this.children !== null)
+      this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
+
     this.image = null;
-
-    if (depth >= 12) return;
-
     const imgSize = 1 << depth;
     this.image = document.createElement("canvas");
     this.image.width = imgSize;
     this.image.height = imgSize;
     const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
 
-    offscreenCtx.clearRect(0, 0, imgSize, imgSize);
-    const drawQuadtree = (node: Quadtree, x: number, y: number, size: number) => {
-      if (size < 1) return;
-
-      if (node.isLeaf()) {
-        const color = colorMap[node.getValue() ?? -1];
-        if (color === "transparent") return;
-
-        offscreenCtx.fillStyle = color;
-        offscreenCtx.fillRect(x, y, size, size);
-        return;
-      }
-
-      const halfSize = size / 2;
-      drawQuadtree(node.getChild(0), x, y, halfSize);
-      drawQuadtree(node.getChild(1), x + halfSize, y, halfSize);
-      drawQuadtree(node.getChild(2), x, y + halfSize, halfSize);
-      drawQuadtree(node.getChild(3), x + halfSize, y + halfSize, halfSize);
+    if (imgSize === 1) { 
+      offscreenCtx.fillStyle = colorMap[this.getValue() ?? -1];
+      offscreenCtx.fillRect(0, 0, 1, 1);
+      return;
     }
 
-    drawQuadtree(this, 0, 0, imgSize);
+    const halfSize = imgSize >> 1;
+    offscreenCtx.imageSmoothingEnabled = false;
+    offscreenCtx.clearRect(0, 0, imgSize, imgSize);
+    offscreenCtx.drawImage(this.getChild(0).image!, 0, 0, halfSize, halfSize);
+    offscreenCtx.drawImage(this.getChild(1).image!, halfSize, 0, halfSize, halfSize);
+    offscreenCtx.drawImage(this.getChild(2).image!, 0, halfSize, halfSize, halfSize);
+    offscreenCtx.drawImage(this.getChild(3).image!, halfSize, halfSize, halfSize, halfSize);
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement, colorMap: { [key: number]: string }, x = 0, y = 0, step = 0) {
@@ -424,6 +432,7 @@ export class Layer {
   colors: Color[];
   children: Layer[];
   quadtree: Quadtree;
+  opacity: number;
   constructor(name: string, parent: Map | Layer) {
     this.name = name;
     this.parent = parent;
@@ -431,6 +440,7 @@ export class Layer {
     this.children = [];
     this.quadtree = new Quadtree(this.colors[0].id, this);
     this.id = getMap(parent).getNextLayerId();
+    this.opacity = 1.0;
   }
 
   /* colors */
@@ -465,7 +475,9 @@ export class Layer {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
+    ctx.globalAlpha = this.opacity;
     this.quadtree.render(ctx, camera, canvas, this.getColorMap());
+    ctx.globalAlpha = 1.0;
     for (const child of this.children) {
       child.render(ctx, camera, canvas);
     }

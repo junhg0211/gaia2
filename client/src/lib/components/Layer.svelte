@@ -9,11 +9,12 @@
   export let selectedColor: ColorClass | null;
   export let selectColor: (c: ColorClass) => void;
   export let rerender: () => void;
+  export let render: () => void;
 
   function newColor() {
-    const colorName = prompt("Enter color name:");
+    const colorName = prompt("색상의 이름을 입력하세요:");
     if (!colorName) return;
-    const colorValue = prompt("Enter color value (hex):", "#ffffff");
+    const colorValue = prompt("색상의 값(헥스)을 입력하세요:", "#ffffff");
     if (!colorValue) return;
     socket.send(`newcolor\t${layer.id}\t${colorName}\t${colorValue}`);
   }
@@ -23,15 +24,24 @@
     if (!layerName) return;
     socket.send(`newlayer\t${layer.id}\t${layerName}`);
   }
+
+  function setOpacity(e: Event) {
+    const newOpacity = parseInt((e.target as HTMLInputElement).value) / 100;
+    layer.opacity = newOpacity;
+    render();
+  }
 </script>
 
 <div class="layer-item">
   <div class="layer-name">
     {layer.name}
   </div>
+  <div class="layer-opacity">
+    <input type="range" min="0" max="100" value={layer.opacity * 100} on:input={setOpacity} />
+  </div>
   <div class="layer-colors">
     {#each layer.colors as color}
-      <ColorComponent {socket} {color} {selectedColor} {selectColor} />
+      <ColorComponent {socket} {color} {selectedColor} {selectColor} removeable={color !== layer.colors[0]} />
     {/each}
     <div class="color-button">
       <button on:click={newColor}>
@@ -41,7 +51,7 @@
   </div>
   <div class="layer-children">
     {#each layer.children as child}
-      <Layer layer={child} {socket} {selectedColor} {selectColor} {rerender} />
+      <Layer layer={child} {socket} {selectedColor} {selectColor} {rerender} {render} />
     {/each}
     <div class="color-button">
       <button on:click={newLayer}>
@@ -53,7 +63,8 @@
 
 <style>
   .layer-item {
-    padding: 0 8px;
+    margin-top: 8px;
+    padding-left: 8px;
     border-left: 4px solid #444444;
   }
 

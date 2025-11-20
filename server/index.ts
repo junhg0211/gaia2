@@ -151,6 +151,20 @@ const commands: Command[] = [
       announce(`changecolor\t${colorId}\t${newColorValue}`);
       color.color = newColorValue;
     }
+  },
+  {
+    prefix: 'removecolor',
+    action: (announce, send, content, args) => {
+      let [rawColorId] = args;
+      const colorId = parseInt(rawColorId);
+
+      const color = map.getColorById(colorId);
+      if (!color) return;
+      const parentLayer: Layer = color.parent;
+      announce(`removecolor\t${colorId}`);
+      parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
+      parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
+    }
   }
 ]
 
