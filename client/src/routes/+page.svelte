@@ -86,7 +86,6 @@
           return [parseFloat(xStr), parseFloat(yStr)];
         });
 
-        console.log("Helo");
         layer.quadtree.fillPolygon(polygon, color.id, depth);
         layer.draw(ctx, camera, canvas);
         render();
@@ -149,6 +148,11 @@
         parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
         parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
         rerender();
+        parentLayer.draw(ctx, camera, canvas);
+        render();
+        if (selectedColor?.id === colorId) {
+          selectColor(parentLayer.colors[0] || null);
+        }
       }
     }
   ];
