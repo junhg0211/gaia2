@@ -205,22 +205,51 @@
     if (!ctx) return;
     if (!camera) return;
 
-    const gridUnit = 1;
+    const preferredGridSizeInPixels = 100 * window.devicePixelRatio;
+    let gridUnit = 1;
+    while (gridUnit * camera.zoom > preferredGridSizeInPixels) {
+      if (gridUnit.toString().endsWith('1')) {
+        gridUnit /= 2;
+      } else {
+        gridUnit /= 5;
+      }
+    }
+    const gridSize = gridUnit * camera.zoom;
     ctx.strokeStyle = '#777777';
     ctx.lineWidth = 1;
-    const leftx = camera.worldToScreen(0, 0)[0] % (gridUnit * camera.zoom);
-    for (let x = leftx; x < canvas.width; x += gridUnit * camera.zoom) {
-      ctx.beginPath();
+    const [leftx, topy] = camera.worldToScreen(0, 0);
+    const [rightx, bottomy] = camera.worldToScreen(1, 1);
+    ctx.beginPath();
+    for (let x = leftx; x < camera.worldToScreen(1, 1)[0]; x += gridSize) {
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);
-      ctx.stroke();
     }
-    const topy = camera.worldToScreen(0, 0)[1] % (gridUnit * camera.zoom);
-    for (let y = topy; y < canvas.height; y += gridUnit * camera.zoom) {
-      ctx.beginPath();
+    ctx.moveTo(rightx, 0);
+    ctx.lineTo(rightx, canvas.height);
+    for (let y = topy; y < camera.worldToScreen(1, 1)[1]; y += gridSize) {
       ctx.moveTo(0, y);
       ctx.lineTo(canvas.width, y);
-      ctx.stroke();
+    }
+    ctx.moveTo(0, bottomy);
+    ctx.lineTo(canvas.width, bottomy);
+    ctx.stroke();
+
+    /* scale indicator */
+    const indicatorHeight = 12 * window.devicePixelRatio;
+    const gridCount = Math.floor((300 * window.devicePixelRatio) / gridSize);
+    ctx.fillStyle = "white";
+    ctx.fillRect(8, canvas.height - indicatorHeight - 12, gridSize * gridCount + 4, indicatorHeight + 4);
+    ctx.fillStyle = "black";
+    ctx.fillRect(9, canvas.height - indicatorHeight - 11, gridSize * gridCount + 2, indicatorHeight + 2);
+    for (let i = 0; i < gridCount; i++) {
+      ctx.fillStyle = i % 2 == 0 ? "white" : "black";
+      ctx.fillRect(10 + i * gridSize, canvas.height - indicatorHeight - 10, gridSize, indicatorHeight);
+      
+      const text = `${(gridUnit * (i + 1) * 1000).toFixed(2)}`;
+      ctx.fillStyle = i % 2 == 0 ? "black" : "white";
+      ctx.font = `${8 * window.devicePixelRatio}px Arial`;
+      ctx.textAlign = "right";
+      ctx.fillText(text, 10 + (i + 1) * gridSize - 4, canvas.height - 12);
     }
   }
 
