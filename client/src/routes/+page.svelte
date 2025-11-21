@@ -145,8 +145,8 @@
         const color = map!.getColorById(colorId);
         if (!color) return;
         const parentLayer: LayerClass = color.parent;
-        parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
         parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
+        parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
         rerender();
         parentLayer.draw();
         render();
