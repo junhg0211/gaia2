@@ -206,8 +206,13 @@ const commands: Command[] = [
   }
 ]
 
+function getTimestamp(): string {
+  const now = new Date();
+  return now.toISOString();
+}
+
 function announce(message: string): void {
-  console.log(`<< ${message.length > 100 ? message.slice(0, 100) + '...' : message}  (${message.length})`);
+  console.log(`${getTimestamp()} << ${message.length > 100 ? message.slice(0, 100) + '...' : message}  (${message.length})`);
   for (const ws of connections) {
     ws.send(message);
   }
@@ -221,19 +226,19 @@ const wss = new WebSocketServer({ port, host });
 
 wss.on('connection', (ws: WebSocket, req: any) => {
   const remoteAddress = req.socket.remoteAddress;
-  console.log(`${remoteAddress} == connected`);
+  console.log(`${getTimestamp()} ${remoteAddress} == connected`);
   connections.push(ws);
 
   ws.on('message', (message: any) => {
     const content = message.toString();
-    console.log(`${remoteAddress} >> ${content.length > 100 ? content.slice(0, 100) + '...' : content}  (${content.length})`);
+    console.log(`${getTimestamp()} ${remoteAddress} >> ${content.length > 100 ? content.slice(0, 100) + '...' : content}  (${content.length})`);
 
     // handle commands
     for (const command of commands) {
       if (content.startsWith(command.prefix)) {
         const args = content.slice(command.prefix.length).trim().split('\t');
         command.action(announce, (msg: string) => {
-          console.log(`${remoteAddress} << ${msg.length > 100 ? msg.slice(0, 100) + '...' : msg}  (${msg.length})`);
+          console.log(`${getTimestamp()} ${remoteAddress} << ${msg.length > 100 ? msg.slice(0, 100) + '...' : msg}  (${msg.length})`);
           send(ws, msg);
         }, content, args);
         return;
@@ -242,7 +247,7 @@ wss.on('connection', (ws: WebSocket, req: any) => {
   });
 
   ws.on('close', () => {
-    console.log(`${remoteAddress} == disconnected`);
+    console.log(`${getTimestamp()} ${remoteAddress} == disconnected`);
     const index = connections.indexOf(ws);
     if (index !== -1) {
       connections.splice(index, 1);
@@ -250,4 +255,4 @@ wss.on('connection', (ws: WebSocket, req: any) => {
   });
 });
 
-console.log(`WebSocket server is running on ws://localhost:${port}`);
+console.log(`${getTimestamp()} WebSocket server is running on ws://localhost:${port}`);
