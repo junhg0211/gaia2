@@ -674,6 +674,7 @@
 
     const mapJSON = JSON.stringify(map.toJSON());
     socket.send(`save`);
+    alert("맵이 저장되었습니다.");
   }
 
   function reloadMap() {
@@ -737,10 +738,12 @@
     font-size: 24px;
     padding: 10px;
     cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
   }
 
   .tool-button:hover {
-    background-color: #333333;
+    background-color: #444444;
   }
 
   .tool-button:disabled {
@@ -776,6 +779,12 @@
     padding: 6px 12px;
     cursor: pointer;
     font-size: 14px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .properties-section button:hover {
+    background-color: #444444;
   }
 
   .section-title {

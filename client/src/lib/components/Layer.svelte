@@ -47,7 +47,7 @@
 
 <div class="layer-item">
   <div>
-    <button class="layer-name" on:dblclick={renameLayer}>{layer.name}</button>
+    <button class="layer-name" on:click={renameLayer}>{layer.name}</button>
     {#if removeable}
       <button on:click={removeLayer} class="delete-button" aria-label="rename">
         <i class="bi bi-trash"></i>
@@ -92,6 +92,12 @@
     color: white;
     cursor: pointer;
     padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  button:hover {
+    background-color: #444444;
   }
 
   .layer-name {

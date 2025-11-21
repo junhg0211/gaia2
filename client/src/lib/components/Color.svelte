@@ -56,6 +56,7 @@
     margin: 4px 0;
     padding-left: 8px;
     border-left: 4px solid #666666;
+    transition: all 0.2s;
   }
 
   .selected {
@@ -67,6 +68,12 @@
     border: none;
     color: white;
     cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  button:hover {
+    background-color: #444444;
   }
 
   .color-button {
