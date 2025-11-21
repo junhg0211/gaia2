@@ -187,6 +187,20 @@
 
   let camera!: Camera;
 
+  function draw(): void {
+    if (!ctx) return;
+    if (!map) return;
+
+    map.draw(ctx, camera, canvas);
+  }
+
+  function renderBackground() {
+    if (!ctx) return;
+
+    ctx.fillStyle = "#19191e";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
   function renderGrid() {
     if (!ctx) return;
     if (!camera) return;
@@ -210,26 +224,14 @@
     }
   }
 
-  function draw(): void {
-    if (!ctx) return;
-    if (!map) return;
-
-    map.draw(ctx, camera, canvas);
-  }
-
   function render(): void {
     if (!ctx) return;
 
-    /* Clear canvas */
-    ctx.fillStyle = '#19191e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    renderBackground();
 
-    /* render map */
     if (!map) return;
-
     map.render(ctx, camera, canvas);
 
-    /* render grid */
     renderGrid();
 
     selectedTool?.onrender?.(ctx);
