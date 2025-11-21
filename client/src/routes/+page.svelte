@@ -457,6 +457,72 @@
       },
     },
     {
+      name: "다각형 채우기",
+      shortcut: 'p',
+      icon: "hexagon",
+      onstart: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'crosshair';
+        toolVar.polygon = [];
+        render();
+      },
+      onend: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'default';
+      },
+      onmousebuttonup: (e: MouseEvent) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+        if (e.button !== 0) return;
+
+        const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
+        toolVar.polygon.push([wx, wy]);
+        render();
+      },
+      onkeydown: (e: MouseEvent) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+        if (toolVar.polygon.length < 3) return;
+        if (e.key !== "Enter") return;
+
+        const layer = selectedColor.parent;
+        const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
+        const depth = Math.log2(camera.zoom * window.devicePixelRatio);
+        socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
+        toolVar.polygon = [];
+        render();
+      },
+      onrender: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+        if (toolVar.polygon.length === 0) return;
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const [startX, startY] = camera.worldToScreen(toolVar.polygon[0][0], toolVar.polygon[0][1]);
+        ctx.moveTo(startX, startY);
+        for (let i = 1; i < toolVar.polygon.length; i++) {
+          const [sx, sy] = camera.worldToScreen(toolVar.polygon[i][0], toolVar.polygon[i][1]);
+          ctx.lineTo(sx, sy);
+        }
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.closePath();
+        ctx.stroke();
+      },
+      onmousemove: (_e: MouseEvent) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+        if (toolVar.polygon.length === 0) return;
+
+        render();
+      },
+    },
+    {
       name: '영역 채우기',
       shortcut: 'f',
       icon: 'feather',
