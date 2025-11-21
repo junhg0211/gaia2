@@ -282,6 +282,10 @@
   function onkeyup(event: KeyboardEvent) {
     keys.delete(event.key);
 
+    if (event.key === " ") {
+      canvas.style.cursor = "default";
+    }
+
     selectedTool?.onkeyup?.(event);
   }
 
@@ -296,7 +300,7 @@
     mouse.dx = mouse.x - mouse.startX;
     mouse.dy = mouse.y - mouse.startY;
 
-    if (mouse.buttons & 2) {
+    if (mouse.buttons & 2 || (keys.has(" ") && mouse.buttons & 1)) {
       const deltaX = (mouse.startX - mouse.x) / camera.zoom;
       const deltaY = (mouse.startY - mouse.y) / camera.zoom;
       camera.setX(camera.x + deltaX);
