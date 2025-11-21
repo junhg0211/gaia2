@@ -252,14 +252,13 @@ export class Quadtree {
       return;
 
     /* check if circle completely contains this quadtree node */
-    const minDistance = Math.min(
+    const maxDistance = Math.max(
       Math.hypot(x - 0, y - 0),
       Math.hypot(x - 1, y - 0),
       Math.hypot(x - 0, y - 1),
       Math.hypot(x - 1, y - 1)
     );
-
-    if (minDistance <= radius) return this.setValue(value);
+    if (maxDistance <= radius) return this.setValue(value);
 
     this.subdivide();
 
@@ -280,9 +279,9 @@ export class Quadtree {
       [x1 + halfWidth * Math.cos(theta - Math.PI / 2), y1 + halfWidth * Math.sin(theta - Math.PI / 2)],
       [x1 + halfWidth * Math.cos(theta + Math.PI / 2), y1 + halfWidth * Math.sin(theta + Math.PI / 2)]
     ];
-    this.fillPolygon(corners, value, depth);
     this.fillCircle(x0, y0, halfWidth, value, depth);
     this.fillCircle(x1, y1, halfWidth, value, depth);
+    this.fillPolygon(corners, value, depth);
   }
 
   overwrite(otherQuadtree: Quadtree, includeFunction: (value: number | null) => boolean) {
