@@ -480,7 +480,7 @@
         toolVar.polygon.push([wx, wy]);
         render();
       },
-      onkeydown: (e: MouseEvent) => {
+      onkeydown: (e: KeyboardEvent) => {
         if (!ctx) return;
         if (!map) return;
         if (!selectedColor) return;

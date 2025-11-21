@@ -6,6 +6,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+  <title>Gaia 2</title>
   <style>
     @font-face {
       font-family: 'unifont';
