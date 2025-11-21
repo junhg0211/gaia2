@@ -216,6 +216,35 @@ const commands: Command[] = [
       announce(`setcolorlock\t${colorId}\t${locked ? 1 : 0}`);
       color.locked = locked;
     }
+  },
+  {
+    prefix: 'fill',
+    action: (announce, send, content, args) => {
+      let [rawLayerId, rawX, rawY, rawColorId] = args;
+      const layerId = parseInt(rawLayerId);
+      const x = parseFloat(rawX);
+      const y = parseFloat(rawY);
+      const colorId = parseInt(rawColorId);
+
+      const layer = map.getLayerById(layerId);;
+      if (!layer) return;
+      const color = map.getColorById(colorId);
+      if (!color) return;
+
+      announce(`fill\t${layerId}\t${x}\t${y}\t${colorId}`);
+      layer.quadtree.floodFill(x, y, color.id);
+    }
+  },
+  {
+    prefix: "loadlayer",
+    action: (announce, send, content, args) => {
+      let [rawLayerId] = args;
+      const layerId = parseInt(rawLayerId);
+
+      const layer = map.getLayerById(layerId);
+      if (!layer) return;
+      send(`layer\t${layerId}\t${JSON.stringify(layer.toJSON())}`);
+    }
   }
 ]
 
@@ -248,7 +277,7 @@ wss.on('connection', (ws: WebSocket, req: any) => {
 
     // handle commands
     for (const command of commands) {
-      if (content.startsWith(command.prefix)) {
+      if (content.startsWith(command.prefix + '\t') || content === command.prefix) {
         const args = content.slice(command.prefix.length).trim().split('\t');
         command.action(announce, (msg: string) => {
           console.log(`${getTimestamp()} ${remoteAddress} << ${msg.length > 100 ? msg.slice(0, 100) + '...' : msg}  (${msg.length})`);

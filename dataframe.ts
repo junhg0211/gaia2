@@ -19,6 +19,11 @@ export class Color {
     this.locked = false;
   }
 
+  /* get layer */
+  getLayer(): Layer {
+    return this.parent;
+  }
+
   /* serialization */
   toJSON(): any {
     return {
@@ -86,7 +91,7 @@ export class Quadtree {
   }
 
   isDivided() {
-    return this.value === null;
+    return this.children !== null;
   }
 
   subdivide() {
@@ -127,6 +132,70 @@ export class Quadtree {
     return 1 + Math.max(...childDepths);
   }
 
+  getNeighbors(): Quadtree[] {
+    // Get the bounding box of this node relative to root
+    const [x0, y0, x1, y1] = this.getBoundingBox();
+    
+    // Get root quadtree
+    let root: Quadtree = this;
+    while (root.parent instanceof Quadtree) {
+      root = root.parent;
+    }
+    
+    // Collect all leaf neighbors that share an edge
+    const neighbors: Quadtree[] = [];
+    const collectNeighbors = (node: Quadtree, nx0: number, ny0: number, nx1: number, ny1: number) => {
+      if (node === this) return;
+      
+      if (node.isLeaf()) {
+        // Check if edges touch
+        const sharesEdge = 
+          // Left/right edge: same x, overlapping y
+          (Math.abs(nx1 - x0) < 1e-10 && ny0 < y1 && ny1 > y0) ||
+          (Math.abs(nx0 - x1) < 1e-10 && ny0 < y1 && ny1 > y0) ||
+          // Top/bottom edge: same y, overlapping x
+          (Math.abs(ny1 - y0) < 1e-10 && nx0 < x1 && nx1 > x0) ||
+          (Math.abs(ny0 - y1) < 1e-10 && nx0 < x1 && nx1 > x0);
+        
+        if (sharesEdge) {
+          neighbors.push(node);
+        }
+        return;
+      }
+      
+      // Recurse into children
+      const midX = (nx0 + nx1) / 2;
+      const midY = (ny0 + ny1) / 2;
+      collectNeighbors(node.getChild(0), nx0, ny0, midX, midY);
+      collectNeighbors(node.getChild(1), midX, ny0, nx1, midY);
+      collectNeighbors(node.getChild(2), nx0, midY, midX, ny1);
+      collectNeighbors(node.getChild(3), midX, midY, nx1, ny1);
+    };
+    
+    collectNeighbors(root, 0, 0, 1, 1);
+    neighbors.sort((a, b) => a.getDepth() - b.getDepth());
+    return neighbors;
+  }
+
+  private getBoundingBox(): [number, number, number, number] {
+    // Returns [x0, y0, x1, y1] of this node relative to root
+    if (!(this.parent instanceof Quadtree)) {
+      return [0, 0, 1, 1];
+    }
+    
+    const [px0, py0, px1, py1] = this.parent.getBoundingBox();
+    const midX = (px0 + px1) / 2;
+    const midY = (py0 + py1) / 2;
+    
+    const index = this.parent.children!.indexOf(this);
+    if (index === 0) return [px0, py0, midX, midY];
+    if (index === 1) return [midX, py0, px1, midY];
+    if (index === 2) return [px0, midY, midX, py1];
+    if (index === 3) return [midX, midY, px1, py1];
+    
+    throw new Error("Node not found in parent's children");
+  }
+
   expandQuadtrants(x: number, y: number, placeholder: number): [(x: number) => number, (y: number) => number] {
     if (x >= 0 && x <= 1 && y >= 0 && y <= 1)
       return [(x: number) => x, (y: number) => y];
@@ -147,7 +216,7 @@ export class Quadtree {
 
     let xer: (x: number) => number, yer: (y: number) => number;
 
-    if (x < 0 && y < 1) {
+    if (x <= 0 && y < 1) {
       this.children[3] = clone;
       x = (x + 1) / 2;
       y = (y + 1) / 2;
@@ -155,7 +224,7 @@ export class Quadtree {
       yer = (y: number) => (y + 1) / 2;
     }
 
-    if (x > 0 && y < 0) {
+    if (x > 0 && y <= 0) {
       this.children[2] = clone;
       x = x / 2;
       y = (y + 1) / 2;
@@ -292,6 +361,72 @@ export class Quadtree {
     this.mergeIfPossible();
   }
 
+  floodFill(x: number, y: number, value: number) {
+    // Use strict outside check (allow filling exactly on boundary coordinates)
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+
+    // Descend to leaf containing (x,y)
+    if (this.isDivided()) {
+      const lux = x * 2, luy = y * 2;
+      this.getChild(0).floodFill(lux, luy, value);
+      this.getChild(1).floodFill(lux - 1, luy, value);
+      this.getChild(2).floodFill(lux, luy - 1, value);
+      this.getChild(3).floodFill(lux - 1, luy - 1, value);
+      return;
+    }
+
+    const originalValue = this.getValue();
+    if (originalValue === value) return;
+    if (this.getLayer().getColor(originalValue).locked) return;
+
+    // BFS over adjacent leaf nodes that have originalValue
+    const stack: Quadtree[] = [this];
+    const visited = new Set<Quadtree>();
+    const changed: Quadtree[] = [];
+
+    while (stack.length) {
+      const node = stack.pop()!;
+      if (visited.has(node)) continue;
+      visited.add(node);
+      if (!node.isLeaf()) {
+        // If encountered a divided node (should be rare once we start at leaf), just descend
+        const [x0, y0, x1, y1] = node.getBoundingBox();
+        const cx = (x0 + x1) / 2;
+        const cy = (y0 + y1) / 2;
+        node.floodFill(cx, cy, value); // delegate
+        continue;
+      }
+      const v = node.getValue();
+      if (v !== originalValue) continue;
+      if (node.getLayer().getColor(v).locked) continue;
+      node.setValue(value);
+      changed.push(node);
+      // Explore neighbors
+      node.getNeighbors().forEach(n => {
+        if (!visited.has(n)) stack.push(n);
+      });
+    }
+
+    // After all changes, attempt upward merging from each changed node
+    for (const leaf of changed) {
+      let p: Quadtree | null = leaf.parent instanceof Quadtree ? leaf.parent : null;
+      while (p) {
+        const beforeChildren = p.children;
+        p.mergeIfPossible();
+        // If this level just collapsed, attempt moving further up
+        if (p.isLeaf() && beforeChildren !== null) {
+          p = p.parent instanceof Quadtree ? p.parent : null;
+          continue;
+        }
+        p = p.parent instanceof Quadtree ? p.parent : null;
+      }
+    }
+    // Final merge pass on root
+    let root: Quadtree = this;
+    while (root.parent instanceof Quadtree) root = root.parent;
+    root.mergeIfPossible();
+  }
+
   drawLine(x0: number, y0: number, x1: number, y1: number, value: number, width: number, depth: number) {
     const theta = Math.atan2(y1 - y0, x1 - x0);
     const halfWidth = width / 2;
@@ -324,7 +459,7 @@ export class Quadtree {
   }
 
   getValueAt(x: number, y: number): number | null {
-    if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+    if (x <= 0 || x > 1 || y <= 0 || y > 1) return null;
 
     if (this.children === null)
       return this.getValue();
@@ -435,7 +570,7 @@ export class Quadtree {
       const size = camera.zoom * Math.pow(0.5, step) + 1;
       ctx.imageSmoothingEnabled = false;
       if (size <= 1) return;
-      if (sx + size < 0 || sy + size < 0 || sx > canvas.width || sy > canvas.height) return;
+      if (sx + size <= 0 || sy + size <= 0 || sx > canvas.width || sy > canvas.height) return;
       if (this.image.width >= size && this.image.height >= size) {
         ctx.drawImage(this.image, sx, sy, size, size);
         return;
@@ -558,6 +693,15 @@ export class Layer {
       children: this.children.map(child => child.toJSON())
     };
   }
+
+  updateFromLayer(layer: Layer) {
+    this.id = layer.id;
+    this.name = layer.name;
+    this.colors = layer.colors;
+    this.children = layer.children;
+    this.quadtree = layer.quadtree;
+    this.opacity = layer.opacity;
+  }
 }
 
 export class Map {
@@ -639,7 +783,7 @@ export function mapFromJSON(json: any): Map {
   return map;
 }
 
-function layerFromJSON(json: any, parent: Map | Layer): Layer {
+export function layerFromJSON(json: any, parent: Map | Layer): Layer {
   const layer = new Layer(json.name, parent);
   layer.id = json.id;
   layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; locked: boolean }) => {

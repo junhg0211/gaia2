@@ -2,7 +2,7 @@
   import Layer from "$lib/components/Layer.svelte";
   import Camera from "$lib/camera";
   import { onMount, onDestroy } from 'svelte';
-  import { mapFromJSON, Color, Map, Layer as LayerClass } from "../../../dataframe";
+  import { mapFromJSON, Color, Map, Layer as LayerClass, layerFromJSON } from "../../../dataframe";
   import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
@@ -188,6 +188,34 @@
         if (!color) return;
         color.locked = locked;
         rerender();
+      }
+    },
+    {
+      prefix: "fill",
+      action: (_send, args) => {
+        const layerId = parseInt(args[0]);
+        const wx = parseFloat(args[1]);
+        const wy = parseFloat(args[2]);
+        const colorId = parseInt(args[3]);
+        const layer = map!.getLayerById(layerId);
+        if (!layer) return;
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+
+        layer.quadtree.floodFill(wx, wy, color.id);
+        layer.draw();
+        render();
+      }
+    },
+    {
+      prefix: 'layer',
+      action: (_send, args) => {
+        const layerId = parseInt(args[0]);
+        const originalLayer = map?.getLayerById(layerId);
+        const layer = layerFromJSON(JSON.parse(args[1]), originalLayer?.parent || map!);
+        originalLayer?.updateFromLayer(layer);
+        layer.draw();
+        render();
       }
     }
   ];
@@ -493,6 +521,21 @@
         if (!map) return;
 
         toolVar.isDrawing = false;
+        render();
+      },
+    },
+    {
+      name: '채우기',
+      shortcut: 'g',
+      icon: 'paint-bucket',
+      onmousebuttondown: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+        if (selectedColor === null) return;
+
+        const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
+        socket.send(`fill\t${selectedColor.getLayer().id}\t${wx}\t${wy}\t${selectedColor.id}`)
         render();
       },
     },
