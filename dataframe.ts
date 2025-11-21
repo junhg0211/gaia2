@@ -26,7 +26,8 @@ export class Color {
     return {
       id: this.id,
       name: this.name,
-      color: this.color
+      color: this.color,
+      locked: this.locked,
     };
   }
 }
@@ -611,9 +612,10 @@ export function mapFromJSON(json: any): Map {
 function layerFromJSON(json: any, parent: Map | Layer): Layer {
   const layer = new Layer(json.name, parent);
   layer.id = json.id;
-  layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; }) => {
+  layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; locked: boolean }) => {
     const color = new Color(colorJson.name, colorJson.color, layer);
     color.id = colorJson.id;
+    color.locked = colorJson.locked;
     return color;
   });
   layer.quadtree = quadtreeFromJSON(json.quadtree, layer);
