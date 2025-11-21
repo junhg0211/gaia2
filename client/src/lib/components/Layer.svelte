@@ -30,12 +30,17 @@
     layer.opacity = newOpacity;
     render();
   }
+
+
+  function renameLayer(event: MouseEvent) {
+    const newName = prompt("새로운 레이어 이름을 입력하세요:", layer.name);
+    if (!newName) return;
+    socket.send(`renamelayer\t${layer.id}\t${newName}`);
+  }
 </script>
 
 <div class="layer-item">
-  <div class="layer-name">
-    {layer.name}
-  </div>
+  <button class="layer-name" on:dblclick={renameLayer}>{layer.name}</button>
   <div class="layer-opacity">
     <input type="range" min="0" max="100" value={layer.opacity * 100} on:input={setOpacity} />
   </div>

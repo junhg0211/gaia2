@@ -1,11 +1,18 @@
 import WebSocket, { WebSocketServer } from 'ws';
-import { Map, Color, Layer } from "../dataframe.ts";
+import { Map, Color, Layer, mapFromJSON } from "../dataframe.ts";
+import fs from 'fs';
 
 /* server setup */
 const port = 48829;
 const host = "0.0.0.0";
 
 let map = new Map();
+const mapPath = 'map.json';
+if (fs.existsSync(mapPath)) {
+  const mapData = fs.readFileSync(mapPath, 'utf-8');
+  const mapJSON = JSON.parse(mapData);
+  map = mapFromJSON(mapJSON);
+}
 
 const connections: WebSocket[] = [];
 type Command = {
@@ -164,6 +171,24 @@ const commands: Command[] = [
       announce(`removecolor\t${colorId}`);
       parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
       parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
+    }
+  },
+  {
+    prefix: 'save',
+    action: (announce, send, content, args) => {
+      const mapJSON = JSON.stringify(map.toJSON());
+      fs.writeFileSync(mapPath, mapJSON);
+    }
+  },
+  {
+    prefix: 'renamelayer',
+    action: (announce, send, content, args) => {
+      let [rawLayerId, newName] = args;
+      const layerId = parseInt(rawLayerId);
+      const layer = map.getLayerById(layerId);
+      if (!layer) return;
+      announce(`renamelayer\t${layerId}\t${newName}`);
+      layer.name = newName;
     }
   }
 ]

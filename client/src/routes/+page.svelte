@@ -154,6 +154,17 @@
           selectColor(parentLayer.colors[0] || null);
         }
       }
+    },
+    {
+      prefix: 'renamelayer',
+      action: (_send, args) => {
+        const layerId = parseInt(args[0]);
+        const newName = args[1];
+        const layer = map!.getLayerById(layerId);
+        if (!layer) return;
+        layer.name = newName;
+        rerender();
+      }
     }
   ];
 
@@ -636,6 +647,15 @@
       socket.close();
     }
   });
+
+  /* map functions */
+  function saveMap() {
+    if (!socket) return;
+    if (!map) return;
+
+    const mapJSON = JSON.stringify(map.toJSON());
+    socket.send(`save`);
+  }
 </script>
 
 <div class="main-container">
@@ -655,11 +675,20 @@
     <canvas id="canvas"></canvas>
   </div>
   <div class="properties-container">
-    {#if map}
-      {#key mapRender}
-        <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} {render} />
-      {/key}
-    {/if}
+    <div class="properties-section">
+      <div class="section-title">동작 팔레트</div>
+      {#if socket}
+        <button on:click={saveMap}>저장</button>
+      {/if}
+    </div>
+    <div class="properties-section">
+      <div class="section-title">레이어 속성</div>
+      {#if map}
+        {#key mapRender}
+          <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} {render} />
+        {/key}
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -709,5 +738,23 @@
   .properties-container {
     width: 200px;
     padding: 8px;
+  }
+
+  .properties-section {
+    margin-bottom: 16px;
+  }
+
+  .properties-section button {
+    background: none;
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .section-title {
+    font-weight: bold;
+    margin-bottom: 8px;
   }
 </style>
