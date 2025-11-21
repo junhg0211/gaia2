@@ -11,12 +11,14 @@ export class Color {
   color: string;
   parent: any;
   id: number;
+  locked: boolean;
 
   constructor(name: string, color: string, parent: any) {
     this.name = name;
     this.color = color;
     this.parent = parent;
     this.id = getMap(parent).getNextColorId();
+    this.locked = false;
   }
 
   /* serialization */
@@ -32,10 +34,10 @@ export class Color {
 export class Quadtree {
   value: number | null;
   children: Quadtree[] | null;
-  parent: Quadtree | Layer | Map;
+  parent: Quadtree | Layer;
   image: HTMLCanvasElement | null; 
 
-  constructor(value: number | null, parent: Quadtree | Layer | Map) {
+  constructor(value: number | null, parent: Quadtree | Layer) {
     this.value = value;
     this.children = null;
     this.parent = parent;
@@ -44,6 +46,17 @@ export class Quadtree {
 
   /* value */
   setValue(value: number) {
+    if (this.isDivided()) {
+      for (const child of this.children!) {
+        child.setValue(value);
+      }
+      this.mergeIfPossible();
+    }
+
+    if (this.value === null) return;
+
+    if (this.isLeaf() && this.getLayer().getColor(this.value).locked) return;
+
     this.value = value;
     this.children = null;
     this.image = null;
@@ -57,11 +70,15 @@ export class Quadtree {
 
   /* children */
   getChild(index: number) {
-    if (this.children === null) {
-      console.log(this);
+    if (this.children === null)
       throw new Error("Cannot get child of a leaf quadtree node.");
-    }
     return this.children[index];
+  }
+
+  getLayer(): Layer {
+    if (this.parent instanceof Layer)
+      return this.parent;
+    return this.parent.getLayer();
   }
 
   /* quadtree */
@@ -74,7 +91,9 @@ export class Quadtree {
   }
 
   subdivide() {
-    if (this.isDivided()) return;
+    if (this.value === null) return;
+
+    if (this.getLayer().getColor(this.value).locked) return;
 
     this.children = [
       new Quadtree(this.value, this),
@@ -167,6 +186,8 @@ export class Quadtree {
 
   /* image representation */
   fillPolygon(polygon: [number, number][], value: number, depth: number) {
+    if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
+
     const polygonContainsPoint = (px: number, py: number, polygon: [number, number][]) => {
       let inside = false;
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -235,6 +256,8 @@ export class Quadtree {
   }
 
   fillCircle(x: number, y: number, radius: number, value: number, depth: number) {
+    if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
+
     if (depth <= 0 || depth === undefined) {
       const distance = Math.hypot(x - 0.5, y - 0.5);
       const containsCenter = distance <= radius;
@@ -339,24 +362,20 @@ export class Quadtree {
   }
 
   /* draw on ctx */
-  draw(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    canvas: HTMLCanvasElement,
-    colorMap: { [key: number]: string }
-  ) {
-    const depth = Math.min(this.getDepth(), 12);
-
+  draw(colorMap: { [key: number]: string }) {
     if (this.children !== null)
-      this.children.forEach(child => child.draw(ctx, camera, canvas, colorMap));
+      this.children.forEach(child => child.draw(colorMap));
 
-    this.image = null;
+    const depth = this.getDepth();
+    if (depth > 12) return;
+
     const imgSize = 1 << depth;
+    this.image = null;
     this.image = document.createElement("canvas");
     this.image.width = imgSize;
     this.image.height = imgSize;
-    const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
 
+    const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
     if (imgSize === 1) { 
       offscreenCtx.fillStyle = colorMap[this.getValue() ?? -1];
       offscreenCtx.fillRect(0, 0, 1, 1);
@@ -476,9 +495,17 @@ export class Layer {
     return colorMap;
   }
 
+  getColor(colorId: number): Color {
+    for (const color of this.colors) {
+      if (color.id === colorId)
+        return color;
+    }
+    throw new Error(`Color with id ${colorId} not found in layer ${this.name}.`);
+  }
+
   /* draw on ctx */
-  draw(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
-    this.quadtree.draw(ctx, camera, canvas, this.getColorMap());
+  draw() {
+    this.quadtree.draw(this.getColorMap());
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
@@ -548,8 +575,8 @@ export class Map {
   }
 
   /* draw on ctx */
-  draw(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
-    this.layer.draw(ctx, camera, canvas);
+  draw() {
+    this.layer.draw();
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
@@ -594,7 +621,7 @@ function layerFromJSON(json: any, parent: Map | Layer): Layer {
   return layer;
 }
 
-function quadtreeFromJSON(json: any, parent: Map | Layer | Quadtree): Quadtree {
+function quadtreeFromJSON(json: any, parent: Layer | Quadtree): Quadtree {
   if (Array.isArray(json)) {
     const node = new Quadtree(null, parent);
     node.children = [

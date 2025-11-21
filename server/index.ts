@@ -203,6 +203,19 @@ const commands: Command[] = [
       announce(`removelayer\t${layerId}`);
       parentLayer.children = parentLayer.children.filter(l => l.id !== layerId);
     }
+  },
+  {
+    prefix: "setcolorlock",
+    action: (announce, send, content, args) => {
+      let [rawColorId, rawLocked] = args;
+      const colorId = parseInt(rawColorId);
+      const locked = rawLocked === '1';
+
+      const color = map.getColorById(colorId);
+      if (!color) return;
+      announce(`setcolorlock\t${colorId}\t${locked ? 1 : 0}`);
+      color.locked = locked;
+    }
   }
 ]
 

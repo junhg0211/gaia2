@@ -27,6 +27,10 @@
     socket.send(`removecolor\t${color.id}`);
   }
 
+  function toggleLock() {
+    socket.send(`setcolorlock\t${color.id}\t${color.locked ? 0 : 1}`);
+  }
+
   function isSelected(): boolean {
     if (!selectedColor) return false;
 
@@ -40,11 +44,13 @@
 >
   <div class="color-name">
     <button on:click={select} on:dblclick={renameColor} class="color-button">
-      <span style="color: {color.color};">&#x25CF;</span>
-      {color.name}
+      <span style="color: {color.color};">&#x25CF;</span> {color.name} #{color.id}
+    </button>
+    <button on:click={toggleLock} class="button" class:locked={color.locked} aria-label="lock">
+      <i class="bi bi-lock"></i>
     </button>
     {#if removeable}
-      <button on:click={removeColor} class="delete-button" aria-label="rename">
+      <button on:click={removeColor} class="button" aria-label="rename">
         <i class="bi bi-trash"></i>
       </button>
     {/if}
@@ -80,7 +86,11 @@
     font-size: 14px;
   }
 
-  .delete-button {
+  .button {
     float: right;
+  }
+
+  .locked {
+    color: #ffcc00;
   }
 </style>

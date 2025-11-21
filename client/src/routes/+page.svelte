@@ -64,7 +64,7 @@
         const color = map!.getColorById(colorId);
         if (!color) return;
         layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
-        layer.draw(ctx, camera, canvas);
+        layer.draw();
         render();
       }
     },
@@ -87,7 +87,7 @@
         });
 
         layer.quadtree.fillPolygon(polygon, color.id, depth);
-        layer.draw(ctx, camera, canvas);
+        layer.draw();
         render();
       }
     },
@@ -148,7 +148,7 @@
         parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
         parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
         rerender();
-        parentLayer.draw(ctx, camera, canvas);
+        parentLayer.draw();
         render();
         if (selectedColor?.id === colorId) {
           selectColor(parentLayer.colors[0] || null);
@@ -178,6 +178,17 @@
         rerender();
         render();
       }
+    },
+    {
+      prefix: "setcolorlock",
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const locked = args[1] === '1';
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        color.locked = locked;
+        rerender();
+      }
     }
   ];
 
@@ -191,7 +202,7 @@
     if (!ctx) return;
     if (!map) return;
 
-    map.draw(ctx, camera, canvas);
+    map.draw();
   }
 
   function renderBackground() {
