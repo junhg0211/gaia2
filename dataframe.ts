@@ -363,7 +363,9 @@ export class Quadtree {
       return;
     }
 
-    const halfSize = imgSize >> 1;
+    const halfSize = 1 << (depth - 1);
+    if (this.children === null)
+      throw new Error("Quadtree children should not be null when drawing divided node.");
     offscreenCtx.imageSmoothingEnabled = false;
     offscreenCtx.clearRect(0, 0, imgSize, imgSize);
     offscreenCtx.drawImage(this.getChild(0).image!, 0, 0, halfSize, halfSize);
@@ -372,13 +374,21 @@ export class Quadtree {
     offscreenCtx.drawImage(this.getChild(3).image!, halfSize, halfSize, halfSize, halfSize);
   }
 
-  render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement, colorMap: { [key: number]: string }, x = 0, y = 0, step = 0) {
+  render(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    canvas: HTMLCanvasElement,
+    colorMap: { [key: number]: string }, x = 0, y = 0, step = 0
+  ) {
     if (this.image) {
       const [sx, sy] = camera.worldToScreen(x, y);
-      const size = camera.zoom * Math.pow(0.5, step);
+      const size = camera.zoom * Math.pow(0.5, step) + 1;
       ctx.imageSmoothingEnabled = false;
       if (size <= 1) return;
-      if (size <= canvas.width && size <= canvas.height) {
+      if (sx + size < 0 || sy + size < 0 || sx > canvas.width || sy > canvas.height) return;
+      if (this.image.width >= size && this.image.height >= size) {
+        ctx.strokeStyle = "red";
+        ctx.strokeRect(sx, sy, size, size);
         ctx.drawImage(this.image, sx, sy, size, size);
         return;
       }
