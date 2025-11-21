@@ -671,6 +671,11 @@
     const mapJSON = JSON.stringify(map.toJSON());
     socket.send(`save`);
   }
+
+  function reloadMap() {
+    if (!socket) return;
+    socket.send(`load`);
+  }
 </script>
 
 <div class="main-container">
@@ -694,6 +699,7 @@
       <div class="section-title">동작 팔레트</div>
       {#if socket}
         <button on:click={saveMap}>저장</button>
+        <button on:click={reloadMap}>새로고침</button>
       {/if}
     </div>
     <div class="properties-section">

@@ -387,8 +387,6 @@ export class Quadtree {
       if (size <= 1) return;
       if (sx + size < 0 || sy + size < 0 || sx > canvas.width || sy > canvas.height) return;
       if (this.image.width >= size && this.image.height >= size) {
-        ctx.strokeStyle = "red";
-        ctx.strokeRect(sx, sy, size, size);
         ctx.drawImage(this.image, sx, sy, size, size);
         return;
       }
