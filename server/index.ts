@@ -190,6 +190,19 @@ const commands: Command[] = [
       announce(`renamelayer\t${layerId}\t${newName}`);
       layer.name = newName;
     }
+  },
+  {
+    prefix: 'removelayer',
+    action: (announce, send, content, args) => {
+      let [rawLayerId] = args;
+      const layerId = parseInt(rawLayerId);
+      const layer = map.getLayerById(layerId);
+      if (!layer) return;
+      if (layer === map.layer) return;
+      const parentLayer = layer.parent as Layer;
+      announce(`removelayer\t${layerId}`);
+      parentLayer.children = parentLayer.children.filter(l => l.id !== layerId);
+    }
   }
 ]
 

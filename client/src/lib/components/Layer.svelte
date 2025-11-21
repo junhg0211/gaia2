@@ -10,6 +10,7 @@
   export let selectColor: (c: ColorClass) => void;
   export let rerender: () => void;
   export let render: () => void;
+  export let removeable: boolean = true;
 
   function newColor() {
     const colorName = prompt("색상의 이름을 입력하세요:");
@@ -37,10 +38,22 @@
     if (!newName) return;
     socket.send(`renamelayer\t${layer.id}\t${newName}`);
   }
+
+  function removeLayer() {
+    if (!confirm(`정말로 레이어 "${layer.name}"을 삭제하시겠습니까?`)) return;
+    socket.send(`removelayer\t${layer.id}`);
+  }
 </script>
 
 <div class="layer-item">
-  <button class="layer-name" on:dblclick={renameLayer}>{layer.name}</button>
+  <div>
+    <button class="layer-name" on:dblclick={renameLayer}>{layer.name}</button>
+    {#if removeable}
+      <button on:click={removeLayer} class="delete-button" aria-label="rename">
+        <i class="bi bi-trash"></i>
+      </button>
+    {/if}
+  </div>
   <div class="layer-opacity">
     <input type="range" min="0" max="100" value={layer.opacity * 100} on:input={setOpacity} />
   </div>
@@ -78,7 +91,14 @@
     border: none;
     color: white;
     cursor: pointer;
-    padding: 4px 0;
+    padding: 2px 6px;
+  }
+
+  .layer-name {
     font-size: 14px;
+  }
+
+  .delete-button {
+    float: right;
   }
 </style>

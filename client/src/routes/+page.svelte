@@ -165,6 +165,19 @@
         layer.name = newName;
         rerender();
       }
+    },
+    {
+      prefix: "removelayer",
+      action: (_send, args) => {
+        const layerId = parseInt(args[0]);
+        const layer = map!.getLayerById(layerId);
+        if (!layer) return;
+        if (!layer.parent) return;
+        if (!(layer.parent instanceof LayerClass)) return;
+        layer.parent.children = layer.parent.children.filter(l => l.id !== layerId);
+        rerender();
+        render();
+      }
     }
   ];
 
@@ -685,7 +698,7 @@
       <div class="section-title">레이어 속성</div>
       {#if map}
         {#key mapRender}
-          <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} {render} />
+          <Layer layer={map.layer} {socket} {selectedColor} {selectColor} {rerender} {render} removeable={false} />
         {/key}
       {/if}
     </div>
