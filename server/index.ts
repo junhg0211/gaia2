@@ -279,23 +279,135 @@ const commands: Command[] = [
 
       const pixelHeight = height / map.size / pixelData.length;
       const pixelWidth = width / map.size / pixelData[0].length;
-      const depth = Math.min(Math.log2(1 / pixelWidth), Math.log2(1 / pixelHeight), 12);
 
-      // for (let j = 0; j < pixelData.length; j++) {
-      //   for (let i = 0; i < pixelData[j].length; i++) {
-      //     const colorValue = pixelData[j][i];
-      //     const colorId = colorMap[colorValue]?.id || layer.colors[0].id;
-      //     layer.quadtree.fillRect(
-      //       pixelWidth * i,
-      //       pixelHeight * j,
-      //       pixelWidth * (i + 1),
-      //       pixelHeight * (j + 1),
-      //       colorId,
-      //       depth
-      //     );
-      //   }
-      //   console.log(`Processed row ${j + 1} of ${pixelData.length}`);
-      // }
+      // Quadtree-based image compression
+      interface Region {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+      }
+
+      // Calculate detail metric for categorical data
+      const calculateDetailMetric = (region: Region): number => {
+        const { x, y, w, h } = region;
+        const categoryCounts: { [key: number]: number } = {};
+        let totalPixels = 0;
+        
+        for (let j = y; j < y + h; j++) {
+          for (let i = x; i < x + w; i++) {
+            if (j < pixelData.length && i < pixelData[j].length) {
+              const category = pixelData[j][i];
+              categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+              totalPixels++;
+            }
+          }
+        }
+
+        if (totalPixels === 0) return 0;
+
+        // If all pixels are the same category, no detail (should merge)
+        const uniqueCategories = Object.keys(categoryCounts).length;
+        if (uniqueCategories === 1) return 0;
+
+        // Calculate entropy-based metric: higher entropy = more diverse = more detail
+        // Entropy measures the unpredictability/diversity of categories
+        let entropy = 0;
+        for (const count of Object.values(categoryCounts)) {
+          const probability = count / totalPixels;
+          entropy -= probability * Math.log2(probability);
+        }
+        
+        // Detail metric = entropy * region size
+        // High entropy (diverse categories) * large region = high detail metric
+        return entropy * (w * h);
+      };
+
+      // Get the most common color in a region
+      const getMostCommonColor = (region: Region): number => {
+        const { x, y, w, h } = region;
+        const colorCounts: { [key: number]: number } = {};
+        
+        for (let j = y; j < y + h; j++) {
+          for (let i = x; i < x + w; i++) {
+            if (j < pixelData.length && i < pixelData[j].length) {
+              const color = pixelData[j][i];
+              colorCounts[color] = (colorCounts[color] || 0) + 1;
+            }
+          }
+        }
+
+        let maxCount = 0;
+        let mostCommonColor = 0;
+        for (const [color, count] of Object.entries(colorCounts)) {
+          if (count > maxCount) {
+            maxCount = count;
+            mostCommonColor = parseInt(color);
+          }
+        }
+
+        return mostCommonColor;
+      };
+
+      // Recursive compression function
+      const compressRegion = (region: Region, threshold: number = 1.0) => {
+        const { x, y, w, h } = region;
+        
+        // Don't subdivide if region is too small (minimum 2x2 for better detail)
+        if (w <= 1 || h <= 1) {
+          const colorValue = getMostCommonColor(region);
+          const colorId = colorMap[colorValue]?.id || layer.colors[0].id;
+          const depth = Math.min(Math.log2(1 / pixelWidth), Math.log2(1 / pixelHeight));
+          
+          layer.quadtree.fillRect(
+            pixelWidth * x,
+            pixelHeight * y,
+            pixelWidth * (x + w),
+            pixelHeight * (y + h),
+            colorId,
+            depth
+          );
+          return;
+        }
+
+        const detailMetric = calculateDetailMetric(region);
+        
+        // If detail metric is below threshold, fill the entire region with most common color
+        if (detailMetric <= threshold) {
+          const colorValue = getMostCommonColor(region);
+          const colorId = colorMap[colorValue]?.id || layer.colors[0].id;
+          const depth = Math.min(Math.log2(1 / pixelWidth), Math.log2(1 / pixelHeight), 12);
+          
+          layer.quadtree.fillRect(
+            pixelWidth * x,
+            pixelHeight * y,
+            pixelWidth * (x + w),
+            pixelHeight * (y + h),
+            colorId,
+            depth
+          );
+          return;
+        }
+
+        // Otherwise, subdivide into 4 quadrants
+        const midW = Math.floor(w / 2);
+        const midH = Math.floor(h / 2);
+        
+        if (midW > 0 && midH > 0) {
+          compressRegion({ x, y, w: midW, h: midH }, threshold);
+          compressRegion({ x: x + midW, y, w: w - midW, h: midH }, threshold);
+          compressRegion({ x, y: y + midH, w: midW, h: h - midH }, threshold);
+          compressRegion({ x: x + midW, y: y + midH, w: w - midW, h: h - midH }, threshold);
+        }
+      };
+
+      // Start compression with adaptive threshold
+      const totalPixels = pixelData.length * pixelData[0].length;
+      const adaptiveThreshold = Math.sqrt(totalPixels) * 0.001; // Lower value = more detail preserved
+      
+      console.log(`Starting quadtree compression with threshold ${adaptiveThreshold}`);
+      compressRegion({ x: 0, y: 0, w: pixelData[0].length, h: pixelData.length }, adaptiveThreshold);
+      console.log(`Compression complete`);
 
       announce(`map\t${JSON.stringify(map.toJSON())}`);
     }
