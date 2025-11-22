@@ -361,6 +361,31 @@ export class Quadtree {
     this.mergeIfPossible();
   }
 
+  fillRect(x0: number, y0: number, x1: number, y1: number, value: number, depth: number) {
+    if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
+
+    if (depth <= 0 || depth === undefined) {
+      const containsCenter = (0.5 >= x0 && 0.5 <= x1 && 0.5 >= y0 && 0.5 <= y1);
+
+      if (containsCenter) return this.setValue(value);
+      else return;
+    }
+    
+    /* check if rectangle completely contains this quadtree node */
+    if (x0 <= 0 && x1 >= 1 && y0 <= 0 && y1 >= 1) return this.setValue(value);
+    /* check if rectangle is completely outside this quadtree node */
+    if (x1 <= 0 || x0 >= 1 || y1 <= 0 || y0 >= 1) return;
+
+    this.subdivide();
+
+    this.getChild(0).fillRect(x0 * 2, y0 * 2, x1 * 2, y1 * 2, value, depth - 1);
+    this.getChild(1).fillRect(x0 * 2 - 1, y0 * 2, x1 * 2 - 1, y1 * 2, value, depth - 1);
+    this.getChild(2).fillRect(x0 * 2, y0 * 2 - 1, x1 * 2, y1 * 2 - 1, value, depth - 1);
+    this.getChild(3).fillRect(x0 * 2 - 1, y0 * 2 - 1, x1 * 2 - 1, y1 * 2 - 1, value, depth - 1);
+
+    this.mergeIfPossible();
+  }
+
   floodFill(x: number, y: number, value: number) {
     // Use strict outside check (allow filling exactly on boundary coordinates)
     if (x < 0 || x > 1 || y < 0 || y > 1) return;

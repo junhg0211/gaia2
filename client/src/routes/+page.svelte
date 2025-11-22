@@ -865,6 +865,124 @@
       return distance.toFixed(2) + " mm";
     }
   }
+
+  function loadImage() {
+    if (!selectedColor) {
+      alert("레이어가 선택되지 않았습니다.");
+      return;
+    }
+    const layer = selectedColor.getLayer();
+
+    const rawWidth = prompt("이미지가 차지할 실제 너비 (km 단위):", "100");
+    if (!rawWidth) return;
+    const width = parseFloat(rawWidth) * 1000000;
+    if (isNaN(width) || width <= 0) {
+      alert("유효한 숫자를 입력해주세요.");
+      return; 
+    }
+
+    const rawHeight = prompt("이미지가 차지할 실제 높이 (km 단위):", "100");
+    if (!rawHeight) return;
+    const height = parseFloat(rawHeight) * 1000000;
+    if (isNaN(height) || height <= 0) {
+      alert("유효한 숫자를 입력해주세요.");
+      return;
+    }
+
+    const colors = prompt("이미지에서 사용할 색상들을 쉼표(,)로 구분하여 입력해주세요 (예: 빨강,#ff0000,초록,#00ff00,파랑,#0000ff):", "검정,#000000,흰색,#ffffff");
+    if (!colors) return;
+    const colorList = colors.split(',').map(s => s.trim());
+    if (colorList.length % 2 !== 0) {
+      alert("색상 입력이 올바르지 않습니다. 이름과 색상 값이 쌍으로 입력되어야 합니다.");
+      return;
+    }
+    const colorPairs: { name: string; color: string }[] = [];
+    for (let i = 0; i < colorList.length; i += 2) {
+      colorPairs.push({ name: colorList[i], color: colorList[i + 1] });
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: Event) => {
+      console.log('File selected');
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        console.log('Image loaded:', reader.result);
+        const img = new Image();
+        img.onload = () => {
+          console.log('Image loaded:', img.width, img.height);
+
+          const offscreenCanvas = document.createElement('canvas');
+          offscreenCanvas.width = img.width;
+          offscreenCanvas.height = img.height;
+          const offscreenCtx = offscreenCanvas.getContext('2d')!;
+          offscreenCtx.drawImage(img, 0, 0);
+          const imageData = offscreenCtx.getImageData(0, 0, img.width, img.height);
+
+          let pixelData: number[][] = [];
+          for (let y = 0; y < img.height; y++) {
+            let row: number[] = [];
+            for (let x = 0; x < img.width; x++) {
+              const offset = (y * img.width + x) * 4;
+              const r = imageData.data[offset];
+              const g = imageData.data[offset + 1];
+              const b = imageData.data[offset + 2];
+              const a = imageData.data[offset + 3];
+              const hexColor = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toLowerCase()}`;
+              const closestColor = getClosestColor(r, g, b, a, colorPairs.map(c => c.color));
+              row.push(colorPairs.findIndex(c => c.color === closestColor));
+            }
+            pixelData.push(row);
+          }
+          socket.send(`loadimage\t${layer.id}\t${width}\t${height}\t${JSON.stringify(colorPairs)}\t${JSON.stringify(pixelData)}`);
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  function getClosestColor(r: number, g: number, b: number, a: number, colorList: string[]): string {
+    let closestColor = '';
+    let closestDistance = Infinity;
+    for (const colorStr of colorList) {
+      const color = hexToRgba(colorStr);
+      if (!color) continue;
+      const dr = r - color.r;
+      const dg = g - color.g;
+      const db = b - color.b;
+      const da = a - color.a;
+      const distance = dr * dr + dg * dg + db * db + da * da;
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestColor = colorStr;
+      }
+    }
+    return closestColor;
+  }
+
+  function hexToRgba(hex: string): { r: number; g: number; b: number; a: number } | null {
+    if (hex.startsWith('#')) {
+      hex = hex.slice(1);
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return { r, g, b, a: 255 };
+    } else if (hex.length === 8) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      const a = parseInt(hex.slice(6, 8), 16);
+      return { r, g, b, a };
+    }
+    return null;
+  }
 </script>
 
 <div class="main-container">
@@ -899,6 +1017,7 @@
         <button on:click={saveMap}>저장</button>
         <button on:click={reloadMap}>새로고침</button>
       {/if}
+      <button on:click={loadImage}>이미지 불러오기</button>
     </div>
     <div class="properties-section">
       <div class="section-title">레이어 속성</div>

@@ -254,6 +254,51 @@ const commands: Command[] = [
       announce(`setmapsize\t${newSize}`);
       map.size = newSize;
     }
+  },
+  {
+    prefix: "loadimage",
+    action: (announce, send, content, args) => {
+      const [rawLayerId, rawWidth, rawHeight, rawColorPairs, rawPixelData] = args;
+      const layerId = parseInt(rawLayerId);
+      const width = parseInt(rawWidth);
+      const height = parseInt(rawHeight);
+
+      const layer = map.getLayerById(layerId);
+      if (!layer) return;
+
+      const colorMap: { [key: number]: Color } = {};
+      const colorPairs = JSON.parse(rawColorPairs) as { name: string; color: string }[];
+      for (let i = 0; i < colorPairs.length; i++) {
+        const pair = colorPairs[i];
+        const color = new Color(pair.name, pair.color, layer);
+        layer.addColor(color);
+        colorMap[i] = color;
+      }
+
+      const pixelData = JSON.parse(rawPixelData) as number[][];
+
+      const pixelHeight = height / map.size / pixelData.length;
+      const pixelWidth = width / map.size / pixelData[0].length;
+      const depth = Math.min(Math.log2(1 / pixelWidth), Math.log2(1 / pixelHeight), 12);
+
+      // for (let j = 0; j < pixelData.length; j++) {
+      //   for (let i = 0; i < pixelData[j].length; i++) {
+      //     const colorValue = pixelData[j][i];
+      //     const colorId = colorMap[colorValue]?.id || layer.colors[0].id;
+      //     layer.quadtree.fillRect(
+      //       pixelWidth * i,
+      //       pixelHeight * j,
+      //       pixelWidth * (i + 1),
+      //       pixelHeight * (j + 1),
+      //       colorId,
+      //       depth
+      //     );
+      //   }
+      //   console.log(`Processed row ${j + 1} of ${pixelData.length}`);
+      // }
+
+      announce(`map\t${JSON.stringify(map.toJSON())}`);
+    }
   }
 ]
 
