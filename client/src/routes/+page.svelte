@@ -217,6 +217,16 @@
         layer.draw();
         render();
       }
+    },
+    {
+      prefix: "setmapsize",
+      action: (_send, args) => {
+        let [rawSize] = args;
+        const newSize = parseFloat(rawSize);
+        if (!map) return;
+        map.size = newSize;
+        render();
+      }
     }
   ];
 
@@ -243,34 +253,41 @@
   function renderGrid() {
     if (!ctx) return;
     if (!camera) return;
+    if (!map) return;
 
     const preferredGridSizeInPixels = 100 * window.devicePixelRatio;
     let gridUnit = 1;
     while (gridUnit * camera.zoom > preferredGridSizeInPixels) {
       if (gridUnit.toString().endsWith('1')) {
         gridUnit /= 2;
+      } else if (gridUnit.toString().endsWith('5')) {
+        gridUnit /= 2.5;
       } else {
-        gridUnit /= 5;
+        gridUnit /= 2;
       }
     }
     const gridSize = gridUnit * camera.zoom;
-    ctx.strokeStyle = '#777777';
-    ctx.lineWidth = 1;
-    const [leftx, topy] = camera.worldToScreen(0, 0);
-    const [rightx, bottomy] = camera.worldToScreen(1, 1);
+    ctx.strokeStyle = '#77777777';
+    ctx.lineWidth = window.devicePixelRatio;
+    const [leftx, topy] = [camera.worldToScreen(0, 0)[0] % gridSize, camera.worldToScreen(0, 0)[1] % gridSize];
     ctx.beginPath();
-    for (let x = leftx; x < camera.worldToScreen(1, 1)[0]; x += gridSize) {
+    for (let x = leftx; x < canvas.width; x += gridSize) {
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);
     }
-    ctx.moveTo(rightx, 0);
-    ctx.lineTo(rightx, canvas.height);
-    for (let y = topy; y < camera.worldToScreen(1, 1)[1]; y += gridSize) {
+    for (let y = topy; y < canvas.height; y += gridSize) {
       ctx.moveTo(0, y);
       ctx.lineTo(canvas.width, y);
     }
-    ctx.moveTo(0, bottomy);
-    ctx.lineTo(canvas.width, bottomy);
+    ctx.stroke();
+
+    ctx.lineWidth = window.devicePixelRatio * 2;
+    ctx.beginPath();
+    ctx.moveTo(...camera.worldToScreen(0, 0));
+    ctx.lineTo(...camera.worldToScreen(1, 0));
+    ctx.lineTo(...camera.worldToScreen(1, 1));
+    ctx.lineTo(...camera.worldToScreen(0, 1));
+    ctx.closePath();
     ctx.stroke();
 
     /* scale indicator */
@@ -284,7 +301,7 @@
       ctx.fillStyle = i % 2 == 0 ? "white" : "black";
       ctx.fillRect(10 + i * gridSize, canvas.height - indicatorHeight - 10, gridSize, indicatorHeight);
       
-      const text = `${(gridUnit * (i + 1) * 1000).toFixed(2)}`;
+      const text = distanceString(gridUnit * (i + 1) * map.size);
       ctx.fillStyle = i % 2 == 0 ? "black" : "white";
       ctx.font = `${8 * window.devicePixelRatio}px Arial`;
       ctx.textAlign = "right";
@@ -508,12 +525,12 @@
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
-        const dist = Math.hypot(toolVar.startX - toolVar.mouseX, toolVar.startY - toolVar.mouseY);
+        const dist = Math.hypot(toolVar.startX - toolVar.mouseX, toolVar.startY - toolVar.mouseY) * map.size;
         const midScreenX = (startX + endX) / 2;
         const midScreenY = (startY + endY) / 2;
         ctx.fillStyle = 'white';
         ctx.font = '16px Arial';
-        ctx.fillText(dist.toFixed(2), midScreenX + 5, midScreenY - 5);
+        ctx.fillText(distanceString(dist), midScreenX + 5, midScreenY - 5);
       },
       onmousebuttonup: (e: MouseEvent) => {
         if (e.button !== 0) return;
@@ -830,6 +847,24 @@
     if (!socket) return;
     socket.send(`load`);
   }
+
+  function resizeMap(e: Event) {
+    if (!socket) return;
+    if (!map) return;
+
+    const newSize = parseFloat((e.target as HTMLInputElement).value);
+    socket.send(`setmapsize\t${newSize}`);
+  }
+
+  function distanceString(distance: number): string {
+    if (distance >= 1000000) {
+      return (distance / 1000000).toFixed(2) + " km";
+    } else if (distance >= 1000) {
+      return (distance / 1000).toFixed(2) + " m";
+    } else {
+      return distance.toFixed(2) + " mm";
+    }
+  }
 </script>
 
 <div class="main-container">
@@ -849,6 +884,15 @@
     <canvas id="canvas"></canvas>
   </div>
   <div class="properties-container">
+    <div class="properties-section">
+      <div class="section-title">맵 설정</div>
+      {#if map}
+        <div class="map-setting">
+          <span class="map-setting-label">맵 크기</span>
+          <span class="map-setting-input"><input type="number" value={map.size} on:input={resizeMap}></span>
+        </div>
+      {/if}
+    </div>
     <div class="properties-section">
       <div class="section-title">동작 팔레트</div>
       {#if socket}
@@ -939,5 +983,29 @@
   .section-title {
     font-weight: bold;
     margin-bottom: 8px;
+  }
+
+  .map-setting {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .map-setting-label {
+    flex: 1;
+  }
+
+  .map-setting-input {
+    flex: 1;
+  }
+
+  .map-setting-input input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    background-color: #222222;
+    color: white;
   }
 </style>

@@ -245,6 +245,15 @@ const commands: Command[] = [
       if (!layer) return;
       send(`layer\t${layerId}\t${JSON.stringify(layer.toJSON())}`);
     }
+  },
+  {
+    prefix: "setmapsize",
+    action: (announce, send, content, args) => {
+      let [rawSize] = args;
+      const newSize = parseFloat(rawSize);
+      announce(`setmapsize\t${newSize}`);
+      map.size = newSize;
+    }
   }
 ]
 

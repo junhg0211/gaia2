@@ -36,7 +36,7 @@ export default class Camera {
     this.y = Math.max(0, Math.min(1, y));
   }
 
-  setZoom(zoom: number) {
-    this.zoom = Math.max(1000, Math.min(5000000, zoom));
+  setZoom(zoom: number, mapSize: number = 1000000000) {
+    this.zoom = Math.max(1000, Math.min(mapSize, zoom));
   }
 }

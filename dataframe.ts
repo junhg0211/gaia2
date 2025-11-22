@@ -708,10 +708,12 @@ export class Map {
   nextLayerId: number;
   nextColorId: number;
   layer: Layer;
+  size: number;
   constructor() {
     this.nextLayerId = 1;
     this.nextColorId = 1;
     this.layer = new Layer("Root", this);
+    this.size = 1_000_000_000;
   }
 
   /* ids */
@@ -763,7 +765,8 @@ export class Map {
     return {
       layer: this.layer.toJSON(),
       nextLayerId: this.nextLayerId,
-      nextColorId: this.nextColorId
+      nextColorId: this.nextColorId,
+      size: this.size
     };
   }
 }
@@ -780,6 +783,7 @@ export function mapFromJSON(json: any): Map {
   map.layer = layerFromJSON(json.layer, map);
   map.nextLayerId = json.nextLayerId;
   map.nextColorId = json.nextColorId;
+  map.size = json.size;
   return map;
 }
 
