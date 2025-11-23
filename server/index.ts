@@ -79,6 +79,9 @@ const commands: Command[] = [
         y0 = yer2(yer1(y0));
         x1 = xer2(xer1(x1));
         y1 = yer2(yer1(y1));
+
+        const sizeFactor = 1 / (xer2(xer1(1)) - xer2(xer1(0)));
+        map.size *= sizeFactor;
       }
 
       const color = map.getColorById(colorId);
@@ -123,6 +126,8 @@ const commands: Command[] = [
         };
         const [xer, yer] = expandLayer(map.layer);
         depth += 1 / (xer(1) - xer(0));
+        const sizeFactor = 1 / (xer(1) - xer(0));
+        map.size *= sizeFactor;
 
         for (let i = 0; i < polygon.length; i++) {
           const [x, y] = polygon[i];

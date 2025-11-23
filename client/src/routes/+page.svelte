@@ -111,8 +111,10 @@
           for (const child of layer.children) {
             expandLayer(child);
           }
+          return [(x: number) => xer2(xer1(x)), (y: number) => yer2(yer1(y))];
         };
-        expandLayer(map!.layer);
+        const [xer, _] = expandLayer(map!.layer);
+        map!.size *= 1 / (xer(1) - xer(0));
         render();
       }
     },
@@ -281,12 +283,39 @@
     }
     ctx.stroke();
 
-    ctx.lineWidth = window.devicePixelRatio * 2;
+    /* coordinates */
+    ctx.font = `${8 * window.devicePixelRatio}px Arial`;
+    ctx.textBaseline = "bottom";
+    ctx.textAlign = "center";
+    for (let x = leftx; x < canvas.width; x += gridSize) {
+      const text = distanceString(camera.screenToWorld(x, 0)[0] * map.size);
+      const width = ctx.measureText(text).width;
+      ctx.fillStyle = "black";
+      ctx.fillRect((x + 2) - width / 2, 0, width, 12 * window.devicePixelRatio);
+      ctx.fillStyle = "white";
+      ctx.fillText(text, x + 2, 12 * window.devicePixelRatio);
+    }
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    for (let y = topy; y < canvas.height; y += gridSize) {
+      const text = distanceString(camera.screenToWorld(0, y)[1] * map.size);
+      const width = ctx.measureText(text).width;
+      ctx.fillStyle = "black";
+      ctx.fillRect(2, y - 6 * window.devicePixelRatio, width, 8 * window.devicePixelRatio);
+      ctx.fillStyle = "white";
+      ctx.fillText(text, 2, y);
+    }
+
+    ctx.lineWidth = 2 * window.devicePixelRatio;
     ctx.beginPath();
-    ctx.moveTo(...camera.worldToScreen(0, 0));
-    ctx.lineTo(...camera.worldToScreen(1, 0));
-    ctx.lineTo(...camera.worldToScreen(1, 1));
-    ctx.lineTo(...camera.worldToScreen(0, 1));
+    const [x1, y1] = camera.worldToScreen(0, 0);
+    ctx.moveTo(Math.max(0, Math.min(canvas.width, x1)), Math.max(0, Math.min(canvas.height, y1)));
+    const [x2, y2] = camera.worldToScreen(1, 0);
+    ctx.lineTo(Math.max(0, Math.min(canvas.width, x2)), Math.max(0, Math.min(canvas.height, y2)));
+    const [x3, y3] = camera.worldToScreen(1, 1);
+    ctx.lineTo(Math.max(0, Math.min(canvas.width, x3)), Math.max(0, Math.min(canvas.height, y3)));
+    const [x4, y4] = camera.worldToScreen(0, 1);
+    ctx.lineTo(Math.max(0, Math.min(canvas.width, x4)), Math.max(0, Math.min(canvas.height, y4)));
     ctx.closePath();
     ctx.stroke();
 
@@ -857,12 +886,15 @@
   }
 
   function distanceString(distance: number): string {
-    if (distance >= 1000000) {
-      return (distance / 1000000).toFixed(2) + " km";
-    } else if (distance >= 1000) {
-      return (distance / 1000).toFixed(2) + " m";
+    const absDistance = Math.abs(distance);
+    if (absDistance >= 1000000) {
+      return (distance / 1000000).toFixed(3) + " km";
+    } else if (absDistance >= 1000) {
+      return (distance / 1000).toFixed(3) + " m";
+    } else if (absDistance >= 1) {
+      return distance.toFixed(3) + " mm";
     } else {
-      return distance.toFixed(2) + " mm";
+      return (distance * 1000).toFixed(3) + " um";
     }
   }
 
@@ -907,7 +939,10 @@
     input.onchange = (e: Event) => {
       console.log('File selected');
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
+      if (!file) {
+        console.log('No file selected');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         console.log('Image loaded:', reader.result);
@@ -943,6 +978,12 @@
       };
       reader.readAsDataURL(file);
     };
+    
+    // 같은 파일을 다시 선택해도 onchange가 발생하도록 value를 초기화
+    input.addEventListener('click', () => {
+      input.value = '';
+    });
+    
     input.click();
   }
 
@@ -1006,7 +1047,7 @@
       <div class="section-title">맵 설정</div>
       {#if map}
         <div class="map-setting">
-          <span class="map-setting-label">맵 크기</span>
+          <span class="map-setting-label">맵 크기 (mm)</span>
           <span class="map-setting-input"><input type="number" value={map.size} on:input={resizeMap}></span>
         </div>
       {/if}
