@@ -1,9 +1,6 @@
+import Camera from "./camera";
+
 /* data */
-interface Camera {
-  worldToScreen(x: number, y: number): [number, number];
-  isBoxOutsideViewbox(x0: number, y0: number, x1: number, y1: number): boolean;
-  zoom: number;
-}
 export class Color {
   name: string;
   color: string;
@@ -87,11 +84,11 @@ export class Quadtree {
 
   /* quadtree */
   isLeaf() {
-    return this.value !== null;
+    return this.value !== null && this.children === null;
   }
 
   isDivided() {
-    return this.children !== null;
+    return this.children instanceof Array;
   }
 
   subdivide() {
@@ -393,10 +390,10 @@ export class Quadtree {
     // Descend to leaf containing (x,y)
     if (this.isDivided()) {
       const lux = x * 2, luy = y * 2;
-      this.getChild(0).floodFill(lux, luy, value);
-      this.getChild(1).floodFill(lux - 1, luy, value);
-      this.getChild(2).floodFill(lux, luy - 1, value);
-      this.getChild(3).floodFill(lux - 1, luy - 1, value);
+      this.isDivided() && this.getChild(0).floodFill(lux, luy, value);
+      this.isDivided() && this.getChild(1).floodFill(lux - 1, luy, value);
+      this.isDivided() && this.getChild(2).floodFill(lux, luy - 1, value);
+      this.isDivided() && this.getChild(3).floodFill(lux - 1, luy - 1, value);
       return;
     }
 
@@ -776,13 +773,20 @@ export class Map {
     return searchLayerForColor(this.layer, colorId);
   }
 
-  /* draw on ctx */
+  /* image rendering */
   draw() {
     this.layer.draw();
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.layer.render(ctx, camera, canvas);
+  }
+
+  renderToImage(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, width: number, height: number) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const camera = new Camera(canvas);
+    camera.zoomToFit(width, height, this.size, this.size);
+    this.render(ctx, camera, canvas);
   }
 
   /* serialization */
