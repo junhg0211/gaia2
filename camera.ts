@@ -37,7 +37,7 @@ export default class Camera {
   }
 
   setZoom(zoom: number, mapSize: number = 1000000000) {
-    this.zoom = Math.max(1000, Math.min(mapSize, zoom));
+    this.zoom = Math.max(10, Math.min(mapSize, zoom));
   }
 
   zoomToFit(viewportSize: number, mapSize: number) {

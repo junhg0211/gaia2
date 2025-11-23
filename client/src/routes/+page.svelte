@@ -258,7 +258,7 @@
     if (!map) return;
 
     const preferredGridSizeInPixels = 100 * window.devicePixelRatio;
-    let gridUnit = 1;
+    let gridUnit = 1000;
     while (gridUnit * camera.zoom > preferredGridSizeInPixels) {
       if (gridUnit.toString().endsWith('1')) {
         gridUnit /= 2;
@@ -1031,15 +1031,7 @@
       return;
     }
 
-    const rawSize = prompt("저장할 이미지의 실제 너비 (km 단위):", (map.size / 1000000).toString());
-    if (!rawSize) return;
-    const size = parseFloat(rawSize) * 1000000;
-    if (isNaN(size) || size <= 0) {
-      alert("유효한 숫자를 입력해주세요.");
-      return; 
-    }
-
-    const canvasSize = prompt("저장할 이미지의 가로 해상도 (픽셀 단위):", (map.size / 250000).toString());
+    const canvasSize = prompt("저장할 이미지의 해상도 (픽셀 단위):", (map.size / 250000).toString());
     if (!canvasSize) return;
     const cs = parseInt(canvasSize);
     if (isNaN(cs) || cs <= 0) {
@@ -1051,7 +1043,7 @@
     offscreenCanvas.width = cs;
     offscreenCanvas.height = cs;
     const offscreenCtx = offscreenCanvas.getContext('2d')!;
-    map.renderToImage(offscreenCanvas, offscreenCtx, size, size);
+    map.renderToImage(offscreenCanvas, offscreenCtx, map.size, map.size);
 
     const dataURL = offscreenCanvas.toDataURL('image/png');
     const link = document.createElement('a');
