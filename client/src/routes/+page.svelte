@@ -1031,38 +1031,35 @@
       return;
     }
 
-    const rawWidth = prompt("저장할 이미지의 실제 너비 (km 단위):", "100");
-    if (!rawWidth) return;
-    const width = parseFloat(rawWidth) * 1000000;
-    if (isNaN(width) || width <= 0) {
+    const rawSize = prompt("저장할 이미지의 실제 너비 (km 단위):", (map.size / 1000000).toString());
+    if (!rawSize) return;
+    const size = parseFloat(rawSize) * 1000000;
+    if (isNaN(size) || size <= 0) {
       alert("유효한 숫자를 입력해주세요.");
       return; 
     }
 
-    const rawHeight = prompt("저장할 이미지의 실제 높이 (km 단위):", "100");
-    if (!rawHeight) return;
-    const height = parseFloat(rawHeight) * 1000000;
-    if (isNaN(height) || height <= 0) {
-      alert("유효한 숫자를 입력해주세요.");
-      return;
-    }
-
-    const canvasWidth = prompt("저장할 이미지의 가로 해상도 (픽셀 단위):", "1000");
-    if (!canvasWidth) return;
-    const canvasHeight = prompt("저장할 이미지의 세로 해상도 (픽셀 단위):", "1000");
-    if (!canvasHeight) return;
-    const cw = parseInt(canvasWidth);
-    const ch = parseInt(canvasHeight);
-    if (isNaN(cw) || isNaN(ch) || cw <= 0 || ch <= 0) {
+    const canvasSize = prompt("저장할 이미지의 가로 해상도 (픽셀 단위):", (map.size / 250000).toString());
+    if (!canvasSize) return;
+    const cs = parseInt(canvasSize);
+    if (isNaN(cs) || cs <= 0) {
       alert("유효한 해상도를 입력해주세요.");
       return;
     }
 
     const offscreenCanvas = document.createElement('canvas');
-    offscreenCanvas.width = cw;
-    offscreenCanvas.height = ch;
+    offscreenCanvas.width = cs;
+    offscreenCanvas.height = cs;
     const offscreenCtx = offscreenCanvas.getContext('2d')!;
-    map.renderToImage(offscreenCanvas, offscreenCtx, width, height);
+    map.renderToImage(offscreenCanvas, offscreenCtx, size, size);
+
+    const dataURL = offscreenCanvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.href = dataURL;
+    link.download = 'map_image.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 </script>
 

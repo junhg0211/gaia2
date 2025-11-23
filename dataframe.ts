@@ -785,7 +785,7 @@ export class Map {
   renderToImage(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, width: number, height: number) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const camera = new Camera(canvas);
-    camera.zoomToFit(width, height, this.size, this.size);
+    camera.zoomToFit(width, this.size);
     this.render(ctx, camera, canvas);
   }
 
