@@ -267,40 +267,9 @@ export class Quadtree {
 
     if (depth <= 0 || depth === undefined) {
       const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
-
       if (containsCenter) return this.setValue(value);
       else return;
     }
-
-    /* check if polygon completely contains this quadtree node */
-    const linesIntersect = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number) => { 
-      const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
-      if (denom === 0) return false;
-      const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
-      const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
-      return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
-    };
-
-    const polygonContainsRect = (polygon: [number, number][]) => {
-      if (!polygonContainsPoint(0, 0, polygon)) return false;
-      if (!polygonContainsPoint(1, 0, polygon)) return false;
-      if (!polygonContainsPoint(0, 1, polygon)) return false;
-      if (!polygonContainsPoint(1, 1, polygon)) return false;
-
-      for (let i = 0; i < polygon.length - 1; i++) {
-        const x0 = polygon[i][0], y0 = polygon[i][1];
-        const x1 = polygon[i + 1][0], y1 = polygon[i + 1][1];
-
-        if (linesIntersect(x0, y0, x1, y1, 0, 0, 1, 0)) return false;
-        if (linesIntersect(x0, y0, x1, y1, 1, 0, 1, 1)) return false;
-        if (linesIntersect(x0, y0, x1, y1, 1, 1, 0, 1)) return false;
-        if (linesIntersect(x0, y0, x1, y1, 0, 1, 0, 0)) return false;
-      }
-
-      return true;
-    };
-
-    if (polygonContainsRect(polygon)) return this.setValue(value);
 
     /* check if polygon is completely outside this quadtree node */
     const polygonMinX = Math.min(...polygon.map(p => p[0])); 
@@ -311,12 +280,10 @@ export class Quadtree {
     if (polygonMaxX <= 0 || polygonMinX >= 1 || polygonMaxY <= 0 || polygonMinY >= 1) return;
 
     this.subdivide();
-
     this.getChild(0).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2]), value, depth - 1);
     this.getChild(1).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2]), value, depth - 1);
     this.getChild(2).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2 - 1]), value, depth - 1);
     this.getChild(3).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2 - 1]), value, depth - 1);
-
     this.mergeIfPossible();
   }
 
@@ -349,12 +316,10 @@ export class Quadtree {
     if (maxDistance <= radius) return this.setValue(value);
 
     this.subdivide();
-
     this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, value, depth - 1);
     this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, value, depth - 1);
     this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, value, depth - 1);
     this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, value, depth - 1);
-
     this.mergeIfPossible();
   }
 

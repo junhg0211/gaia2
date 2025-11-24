@@ -484,6 +484,7 @@
   };
 
   let selectedTool: Tool;
+  let depthDelta = 0;
   type ToolVar = {
     brushSize: number;
     isDrawing: boolean;
@@ -647,7 +648,7 @@
         ];
         const polygonStr = polygon.map(([x, y]) => `${x},${y}`).join(';');
         const layer = selectedColor.parent;
-        const depth = Math.log2(camera.zoom);
+        const depth = Math.log2(camera.zoom) + depthDelta;
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
 
         toolVar.startX = 0;
@@ -690,7 +691,7 @@
 
         const layer = selectedColor.parent;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
-        const depth = Math.log2(camera.zoom);
+        const depth = Math.log2(camera.zoom) + depthDelta;
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
         toolVar.polygon = [];
         render();
@@ -755,7 +756,7 @@
         toolVar.isDrawing = false;
         const layer = selectedColor.parent;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
-        const depth = Math.log2(camera.zoom);
+        const depth = Math.log2(camera.zoom) + depthDelta;
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
         render();
       },
@@ -805,7 +806,7 @@
         if (toolVar.isDrawing) {
           const [x0, y0] = camera.screenToWorld(mouse.x, mouse.y);
           const [x1, y1] = camera.screenToWorld(toolVar.previousMouseX, toolVar.previousMouseY);
-          const depth = Math.log2(camera.zoom);
+          const depth = Math.log2(camera.zoom) + depthDelta;
           socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${depth}`);
         }
 
@@ -1155,6 +1156,10 @@
         <div class="map-setting">
           <span class="map-setting-label">맵 크기 (mm)</span>
           <span class="map-setting-input"><input type="number" value={map.size} on:input={resizeMap}></span>
+        </div>
+        <div class="map-setting">
+          <span class="map-setting-label">깊이 델타</span>
+          <span class="map-setting-input"><input type="number" bind:value={depthDelta}></span>
         </div>
       {/if}
     </div>
