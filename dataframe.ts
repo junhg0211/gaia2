@@ -37,16 +37,20 @@ export class Quadtree {
   children: Quadtree[] | null;
   parent: Quadtree | Layer;
   image: HTMLCanvasElement | null; 
+  changes: boolean;
 
   constructor(value: number | null, parent: Quadtree | Layer) {
     this.value = value;
     this.children = null;
     this.parent = parent;
     this.image = null;
+    this.changes = true;
   }
 
   /* value */
   setValue(value: number) {
+    this.changes = true;
+
     if (this.isDivided()) {
       for (const child of this.children!) {
         child.setValue(value);
@@ -93,8 +97,9 @@ export class Quadtree {
 
   subdivide() {
     if (this.value === null) return;
-
     if (this.getLayer().getColor(this.value).locked) return;
+
+    this.changes = true;
 
     this.children = [
       new Quadtree(this.value, this),
@@ -107,6 +112,8 @@ export class Quadtree {
 
   mergeIfPossible() {
     if (this.children === null) return;
+
+    this.changes = true;
 
     for (const child of this.children) child.mergeIfPossible();
 
@@ -206,6 +213,7 @@ export class Quadtree {
       new Quadtree(placeholder, this),
     ];
     this.image = null;
+    this.changes = true;
 
     try {
       this.subdivide();
@@ -253,6 +261,8 @@ export class Quadtree {
   fillPolygon(polygon: [number, number][], value: number, depth: number) {
     if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
 
+    this.changes = true;
+
     const polygonContainsPoint = (px: number, py: number, polygon: [number, number][]) => {
       let inside = false;
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -290,6 +300,8 @@ export class Quadtree {
   fillCircle(x: number, y: number, radius: number, value: number, depth: number) {
     if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
 
+    this.changes = true;
+
     if (depth <= 0 || depth === undefined) {
       const distance = Math.hypot(x - 0.5, y - 0.5);
       const containsCenter = distance <= radius;
@@ -326,6 +338,8 @@ export class Quadtree {
   fillRect(x0: number, y0: number, x1: number, y1: number, value: number, depth: number) {
     if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
 
+    this.changes = true;
+
     if (depth <= 0 || depth === undefined) {
       const containsCenter = (0.5 >= x0 && 0.5 <= x1 && 0.5 >= y0 && 0.5 <= y1);
 
@@ -351,6 +365,8 @@ export class Quadtree {
   floodFill(x: number, y: number, value: number) {
     // Use strict outside check (allow filling exactly on boundary coordinates)
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
+
+    this.changes = true;
 
     // Descend to leaf containing (x,y)
     if (this.isDivided()) {
@@ -428,23 +444,6 @@ export class Quadtree {
     this.fillPolygon(corners, value, depth);
   }
 
-  overwrite(otherQuadtree: Quadtree, includeFunction: (value: number | null) => boolean) {
-    if (otherQuadtree.isLeaf()) {
-      if (includeFunction(otherQuadtree.getValue()))
-        this.setValue(otherQuadtree.getValue());
-      return;
-    }
-
-    this.subdivide();
-    if (this.children === null)
-      throw new Error("Quadtree children should not be null after subdivision.");
-
-    for (let i = 0; i < 4; i++)
-      this.children[i].overwrite(otherQuadtree.getChild(i), includeFunction);
-
-    this.mergeIfPossible();
-  }
-
   getValueAt(x: number, y: number): number | null {
     if (x <= 0 || x > 1 || y <= 0 || y > 1) return null;
 
@@ -468,6 +467,8 @@ export class Quadtree {
   }
 
   removeColor(colorId: number, placeholder: number) {
+    this.changes = true;
+
     if (this.isLeaf()) {
       if (this.getValue() === colorId) {
         this.setValue(placeholder);
@@ -484,6 +485,9 @@ export class Quadtree {
 
   /* draw on ctx */
   draw(colorMap: { [key: number]: string }) {
+    if (!this.changes) return;
+    this.changes = false;
+
     const depth = this.getDepth();
 
     if (this.children !== null)
@@ -521,6 +525,7 @@ export class Quadtree {
   ) {
     const [sx, sy] = camera.worldToScreen(x, y);
     const size = camera.zoom * Math.pow(0.5, step) + 1;
+    const debug = true;
 
     if (sx + size < 0 || sx > canvas.width || sy + size < 0 || sy > canvas.height) return;
     if (this.isLeaf() && colorMap[this.getValue() ?? -1] === "transparent") return;
@@ -529,6 +534,16 @@ export class Quadtree {
       if (this.image === null) this.draw(colorMap);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.image!, sx, sy, size, size);
+      
+      if (debug) {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = window.devicePixelRatio;
+        ctx.strokeRect(sx, sy, size, size);
+        if (this.image) {
+          console.log(this.image.width);
+        }
+      }
+
       return;
     }
 
@@ -542,6 +557,13 @@ export class Quadtree {
       if (this.image === null) this.draw(colorMap);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.image!, sx, sy, size, size);
+      
+      if (debug) {
+        ctx.strokeStyle = "blue";
+        ctx.lineWidth = window.devicePixelRatio;
+        ctx.strokeRect(sx, sy, size, size);
+      }
+
       return;
     }
   }
