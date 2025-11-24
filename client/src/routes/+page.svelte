@@ -649,6 +649,11 @@
         const layer = selectedColor.parent;
         const depth = Math.log2(camera.zoom);
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
+
+        toolVar.startX = 0;
+        toolVar.startY = 0;
+        toolVar.mouseX = 0;
+        toolVar.mouseY = 0;
         render();
       },
     },
