@@ -96,6 +96,7 @@
         });
 
         layer.quadtree.fillPolygon(polygon, color.id, depth);
+        layer.draw();
         render();
       }
     },
