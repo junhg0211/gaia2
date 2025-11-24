@@ -6,7 +6,7 @@
   import "bootstrap-icons/font/bootstrap-icons.css";
 
   /* websocket setup */
-  const wsurl = 'ws://localhost:48829';
+  let wsurl: string;
   let socket: WebSocket;
   type ProtocolCommand = {
     prefix: string;
@@ -138,6 +138,7 @@
         if (!color) return;
         color.color = newColorValue;
         rerender();
+        render();
       }
     },
     {
@@ -257,7 +258,7 @@
     if (!camera) return;
     if (!map) return;
 
-    const preferredGridSizeInPixels = 100 * window.devicePixelRatio;
+    const preferredGridSizeInPixels = 300 * window.devicePixelRatio;
     let gridUnit = 1000;
     while (gridUnit * camera.zoom > preferredGridSizeInPixels) {
       if (gridUnit.toString().endsWith('1')) {
@@ -321,7 +322,7 @@
 
     /* scale indicator */
     const indicatorHeight = 12 * window.devicePixelRatio;
-    const gridCount = Math.floor((300 * window.devicePixelRatio) / gridSize);
+    const gridCount = Math.floor((1000 * window.devicePixelRatio) / gridSize);
     ctx.fillStyle = "white";
     ctx.fillRect(8, canvas.height - indicatorHeight - 12, gridSize * gridCount + 4, indicatorHeight + 4);
     ctx.fillStyle = "black";
@@ -586,6 +587,72 @@
       },
     },
     {
+      name: '사각형 채우기',
+      shortcut: 'm',
+      icon: 'square',
+      onstart: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'crosshair';
+        toolVar.startX = 0;
+        toolVar.startY = 0;
+        toolVar.mouseX = 0;
+        toolVar.mouseY = 0;
+        render();
+      },
+      onend: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'default';
+        render();
+      },
+      onmousebuttondown: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+
+        toolVar.isDrawing = true;
+        [toolVar.startX, toolVar.startY] = camera.screenToWorld(mouse.x, mouse.y);
+      },
+      onmousemove: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!toolVar.isDrawing) return;
+        [toolVar.mouseX, toolVar.mouseY] = camera.screenToWorld(mouse.x, mouse.y);
+        render();
+      },
+      onrender: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (toolVar.startX === 0 && toolVar.startY === 0 && toolVar.mouseX === 0 && toolVar.mouseY === 0) return;
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const [startX, startY] = camera.worldToScreen(toolVar.startX, toolVar.startY);
+        const [endX, endY] = camera.worldToScreen(toolVar.mouseX, toolVar.mouseY);
+        ctx.rect(startX, startY, endX - startX, endY - startY);
+        ctx.stroke();
+      },
+      onmousebuttonup: (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        if (!ctx) return;
+        if (!map) return;
+        if (selectedColor === null) return;
+        toolVar.isDrawing = false;
+        const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
+        const polygon = [
+          [toolVar.startX, toolVar.startY],
+          [wx, toolVar.startY],
+          [wx, wy],
+          [toolVar.startX, wy],
+        ];
+        const polygonStr = polygon.map(([x, y]) => `${x},${y}`).join(';');
+        const layer = selectedColor.parent;
+        const depth = Math.log2(camera.zoom);
+        socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
+        render();
+      },
+    },
+    {
       name: "다각형 채우기",
       shortcut: 'p',
       icon: "hexagon",
@@ -618,7 +685,7 @@
 
         const layer = selectedColor.parent;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
-        const depth = Math.log2(camera.zoom * window.devicePixelRatio);
+        const depth = Math.log2(camera.zoom);
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
         toolVar.polygon = [];
         render();
@@ -683,7 +750,7 @@
         toolVar.isDrawing = false;
         const layer = selectedColor.parent;
         const polygonStr = toolVar.polygon.map(([x, y]) => `${x},${y}`).join(';');
-        const depth = Math.log2(camera.zoom * window.devicePixelRatio);
+        const depth = Math.log2(camera.zoom);
         socket.send(`fillpolygon\t${layer.id}\t${polygonStr}\t${selectedColor.id}\t${depth}`);
         render();
       },
@@ -733,7 +800,7 @@
         if (toolVar.isDrawing) {
           const [x0, y0] = camera.screenToWorld(mouse.x, mouse.y);
           const [x1, y1] = camera.screenToWorld(toolVar.previousMouseX, toolVar.previousMouseY);
-          const depth = Math.log2(camera.zoom * window.devicePixelRatio);
+          const depth = Math.log2(camera.zoom);
           socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${depth}`);
         }
 
@@ -834,6 +901,7 @@
     window.addEventListener('wheel', onwheel);
 
     /* Initialize WebSocket */
+    wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", "ws://localhost:48829") || 'ws://localhost:48829';
     socket = new WebSocket(wsurl);
 
     socket.addEventListener('open', () => {
@@ -905,51 +973,48 @@
     }
     const layer = selectedColor.getLayer();
 
-    const rawWidth = prompt("이미지가 차지할 실제 너비 (km 단위):", "100");
-    if (!rawWidth) return;
-    const width = parseFloat(rawWidth) * 1000000;
-    if (isNaN(width) || width <= 0) {
-      alert("유효한 숫자를 입력해주세요.");
-      return; 
-    }
-
-    const rawHeight = prompt("이미지가 차지할 실제 높이 (km 단위):", "100");
-    if (!rawHeight) return;
-    const height = parseFloat(rawHeight) * 1000000;
-    if (isNaN(height) || height <= 0) {
-      alert("유효한 숫자를 입력해주세요.");
-      return;
-    }
-
-    const colors = prompt("이미지에서 사용할 색상들을 쉼표(,)로 구분하여 입력해주세요 (예: 빨강,#ff0000,초록,#00ff00,파랑,#0000ff):", "검정,#000000,흰색,#ffffff");
-    if (!colors) return;
-    const colorList = colors.split(',').map(s => s.trim());
-    if (colorList.length % 2 !== 0) {
-      alert("색상 입력이 올바르지 않습니다. 이름과 색상 값이 쌍으로 입력되어야 합니다.");
-      return;
-    }
-    const colorPairs: { name: string; color: string }[] = [];
-    for (let i = 0; i < colorList.length; i += 2) {
-      colorPairs.push({ name: colorList[i], color: colorList[i + 1] });
-    }
-
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.onchange = (e: Event) => {
-      console.log('File selected');
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) {
-        console.log('No file selected');
+      const rawWidth = prompt("이미지가 차지할 실제 너비 (km 단위):", "100");
+      if (!rawWidth) return;
+      const width = parseFloat(rawWidth) * 1000000;
+      if (isNaN(width) || width <= 0) {
+        alert("유효한 숫자를 입력해주세요.");
+        return; 
+      }
+
+      const rawHeight = prompt("이미지가 차지할 실제 높이 (km 단위):", "100");
+      if (!rawHeight) return;
+      const height = parseFloat(rawHeight) * 1000000;
+      if (isNaN(height) || height <= 0) {
+        alert("유효한 숫자를 입력해주세요.");
         return;
       }
+
+      const colors = prompt("이미지에서 사용할 색상들을 쉼표(,)로 구분하여 입력해주세요 (예: 빨강,#ff0000,초록,#00ff00,파랑,#0000ff):", "검정,#000000,흰색,#ffffff");
+      if (!colors) return;
+      const colorList = colors.split(',').map(s => s.trim());
+      if (colorList.length % 2 !== 0) {
+        alert("색상 입력이 올바르지 않습니다. 이름과 색상 값이 쌍으로 입력되어야 합니다.");
+        return;
+      }
+      const colorPairs: { name: string; color: string }[] = [];
+      for (let i = 0; i < colorList.length; i += 2) {
+        colorPairs.push({ name: colorList[i], color: colorList[i + 1] });
+      }
+
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) {
+        alert("파일이 선택되지 않았습니다.");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => {
-        console.log('Image loaded:', reader.result);
         const img = new Image();
         img.onload = () => {
-          console.log('Image loaded:', img.width, img.height);
-
           const offscreenCanvas = document.createElement('canvas');
           offscreenCanvas.width = img.width;
           offscreenCanvas.height = img.height;
@@ -1054,6 +1119,10 @@
     document.body.removeChild(link);
   }
 </script>
+
+<svelte:head>
+  <title>Gaia 2 :: {wsurl}</title>
+</svelte:head>
 
 <div class="main-container">
   <div class="toolbar">
