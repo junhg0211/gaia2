@@ -416,6 +416,17 @@ const commands: Command[] = [
 
       announce(`map\t${JSON.stringify(map.toJSON())}`);
     }
+  },
+  {
+    prefix: "draw",
+    action: (announce, send, content, args) => {
+      const [rawLayerId] = args;
+      const layerId = parseInt(rawLayerId);
+
+      const layer = map.getLayerById(layerId);
+      if (!layer) return;
+      announce(`draw\t${layerId}`);
+    }
   }
 ]
 
