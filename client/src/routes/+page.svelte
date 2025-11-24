@@ -24,6 +24,16 @@
       }
     },
     {
+      prefix: "draw",
+      action: (_send, args) => {
+        const layerId = parseInt(args[0]);
+        const layer = map!.getLayerById(layerId);
+        if (!layer) return;
+        layer.draw();
+        render();
+      }
+    },
+    {
       prefix: "newcolor",
       action: (_send, args) => {
         const layerId = parseInt(args[0]);
@@ -64,7 +74,6 @@
         const color = map!.getColorById(colorId);
         if (!color) return;
         layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
-        layer.draw();
         render();
       }
     },
@@ -87,7 +96,6 @@
         });
 
         layer.quadtree.fillPolygon(polygon, color.id, depth);
-        layer.draw();
         render();
       }
     },
@@ -824,6 +832,8 @@
       },
       onmousebuttonup: () => {
         toolVar.isDrawing = false;
+        if (!selectedColor) return;
+        socket.send(`draw\t${selectedColor.parent.id}`);
       },
       onkeypress: (e: KeyboardEvent) => {
         if (e.key === '[') {

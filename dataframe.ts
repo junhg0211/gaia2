@@ -485,57 +485,24 @@ export class Quadtree {
   /* draw on ctx */
   draw(colorMap: { [key: number]: string }) {
     const depth = this.getDepth();
-    if (depth > 12) return;
-
-    if (depth < 4) {
-      // draw it manually
-      const imgSize = 1 << depth;
-      this.image = null;
-      this.image = document.createElement("canvas");
-      this.image.width = imgSize;
-      this.image.height = imgSize;
-
-      const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
-      offscreenCtx.fillStyle = "transparent";
-      offscreenCtx.fillRect(0, 0, imgSize, imgSize);
-
-      const fillRect = (node: Quadtree, x: number, y: number, size: number) => {
-        if (node.isLeaf()) {
-          const color = colorMap[node.getValue() ?? -1];
-          if (color === "transparent") return;
-          offscreenCtx.fillStyle = color;
-          offscreenCtx.fillRect(x, y, size, size);
-          return;
-        }
-
-        const halfSize = size / 2;
-        fillRect(node.getChild(0), x, y, halfSize);
-        fillRect(node.getChild(1), x + halfSize, y, halfSize);
-        fillRect(node.getChild(2), x, y + halfSize, halfSize);
-        fillRect(node.getChild(3), x + halfSize, y + halfSize, halfSize);
-      };
-
-      fillRect(this, 0, 0, imgSize);
-      return;
-    }
 
     if (this.children !== null)
       this.children.forEach(child => child.draw(colorMap));
 
-    const imgSize = 1 << depth;
+    const imgSize = Math.min(1 << depth, 1 << 10);
     this.image = null;
     this.image = document.createElement("canvas");
     this.image.width = imgSize;
     this.image.height = imgSize;
 
     const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
-    if (imgSize === 1) { 
+    if (this.isLeaf()) { 
       offscreenCtx.fillStyle = colorMap[this.getValue() ?? -1];
       offscreenCtx.fillRect(0, 0, 1, 1);
       return;
     }
 
-    const halfSize = 1 << (depth - 1);
+    const halfSize = imgSize / 2;
     if (this.children === null)
       throw new Error("Quadtree children should not be null when drawing divided node.");
     offscreenCtx.imageSmoothingEnabled = false;
@@ -552,39 +519,31 @@ export class Quadtree {
     canvas: HTMLCanvasElement,
     colorMap: { [key: number]: string }, x = 0, y = 0, step = 0
   ) {
-    if (this.image) {
-      const [sx, sy] = camera.worldToScreen(x, y);
-      const size = camera.zoom * Math.pow(0.5, step) + 1;
+    const [sx, sy] = camera.worldToScreen(x, y);
+    const size = camera.zoom * Math.pow(0.5, step) + 1;
+
+    if (sx + size < 0 || sx > canvas.width || sy + size < 0 || sy > canvas.height) return;
+    if (this.isLeaf() && colorMap[this.getValue() ?? -1] === "transparent") return;
+
+    if (camera.zoom * Math.pow(0.5, step) <= Math.min(canvas.width, canvas.height)) {
+      if (this.image === null) this.draw(colorMap);
       ctx.imageSmoothingEnabled = false;
-      if (size <= 1) return;
-      if (sx + size <= 0 || sy + size <= 0 || sx > canvas.width || sy > canvas.height) return;
-      if (this.image.width >= size && this.image.height >= size) {
-        ctx.drawImage(this.image, sx, sy, size, size);
-        return;
-      }
-    }
-
-    if (camera.isBoxOutsideViewbox(x, y, x + Math.pow(0.5, step), y + Math.pow(0.5, step))) {
+      ctx.drawImage(this.image!, sx, sy, size, size);
       return;
     }
 
-    if (this.isLeaf()) {
-      const color = colorMap[this.value ?? -1];
-      if (color === "transparent") return;
-
-      ctx.fillStyle = color;
-      const [sx, sy] = camera.worldToScreen(x, y);
-      const size = camera.zoom * Math.pow(0.5, step) + 1;
-      if (size < 1) return;
-      ctx.fillRect(sx, sy, size, size);
+    if (this.isDivided()) {
+      const halfSize = Math.pow(0.5, step + 1);
+      this.getChild(0).render(ctx, camera, canvas, colorMap, x, y, step + 1);
+      this.getChild(1).render(ctx, camera, canvas, colorMap, x + halfSize, y, step + 1);
+      this.getChild(2).render(ctx, camera, canvas, colorMap, x, y + halfSize, step + 1);
+      this.getChild(3).render(ctx, camera, canvas, colorMap, x + halfSize, y + halfSize, step + 1);
+    } else {
+      if (this.image === null) this.draw(colorMap);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.image!, sx, sy, size, size);
       return;
     }
-
-    step++;
-    this.getChild(0).render(ctx, camera, canvas, colorMap, x, y, step);
-    this.getChild(1).render(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step), y, step);
-    this.getChild(2).render(ctx, camera, canvas, colorMap, x, y + Math.pow(0.5, step), step);
-    this.getChild(3).render(ctx, camera, canvas, colorMap, x + Math.pow(0.5, step), y + Math.pow(0.5, step), step);
   }
 
   /* serialization */
