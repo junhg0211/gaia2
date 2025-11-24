@@ -906,7 +906,10 @@
     window.addEventListener('wheel', onwheel);
 
     /* Initialize WebSocket */
-    wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", "ws://localhost:48829") || 'ws://localhost:48829';
+    wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", "localhost") || 'localhost';
+    if (!wsurl.startsWith("ws://")) wsurl = "ws://" + wsurl;
+    if (!wsurl.match(/:\d+/)) wsurl += ":48829";
+
     socket = new WebSocket(wsurl);
 
     socket.addEventListener('open', () => {
