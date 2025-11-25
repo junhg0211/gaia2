@@ -981,8 +981,10 @@
       return (distance / 1000).toFixed(3) + " m";
     } else if (absDistance >= 1) {
       return distance.toFixed(3) + " mm";
-    } else {
+    } else if (absDistance >= 0.001) {
       return (distance * 1000).toFixed(3) + " um";
+    } else {
+      return (distance * 1000000).toFixed(3) + " nm";
     }
   }
 
