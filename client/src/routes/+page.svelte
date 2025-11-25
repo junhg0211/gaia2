@@ -803,6 +803,7 @@
       onstart: () => {
         canvas.style.cursor = 'crosshair';
         toolVar.brushSize = toolVar.brushSize ? toolVar.brushSize : 0.01;
+        toolVar.polygon = [];
       },
       onend: () => {
         canvas.style.cursor = 'default';
@@ -817,6 +818,8 @@
           const [x1, y1] = camera.screenToWorld(toolVar.previousMouseX, toolVar.previousMouseY);
           const depth = Math.log2(camera.zoom) + depthDelta;
           socket.send(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${toolVar.brushSize}\t${selectedColor.id}\t${depth}`);
+          toolVar.polygon.push([x0, y0]);
+          render();
         }
 
         toolVar.previousMouseX = mouse.x;
@@ -830,11 +833,13 @@
         if (!selectedColor) return;
 
         toolVar.isDrawing = true;
+        toolVar.polygon.push(camera.screenToWorld(mouse.x, mouse.y));
       },
       onmousebuttonup: () => {
         toolVar.isDrawing = false;
         if (!selectedColor) return;
         socket.send(`draw\t${selectedColor.parent.id}`);
+        toolVar.polygon = [];
       },
       onkeypress: (e: KeyboardEvent) => {
         if (e.key === '[') {
@@ -849,6 +854,19 @@
         if (!ctx) return;
         if (!map) return;
         if (!selectedColor) return;
+
+        if (toolVar.isDrawing) {
+          ctx.strokeStyle = selectedColor.color !== "transparent" ? selectedColor.color : 'white';
+          ctx.lineWidth = toolVar.brushSize * camera.zoom / window.devicePixelRatio * 2;
+          ctx.lineCap = "round"
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          for (const [x, y] of toolVar.polygon) {
+            const [sx, sy] = camera.worldToScreen(x, y);
+            ctx.lineTo(sx, sy);
+          }
+          ctx.stroke();
+        }
 
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 2;

@@ -525,12 +525,12 @@ export class Quadtree {
   ) {
     const [sx, sy] = camera.worldToScreen(x, y);
     const size = camera.zoom * Math.pow(0.5, step) + 1;
-    const debug = true;
+    const debug = false;
 
     if (sx + size < 0 || sx > canvas.width || sy + size < 0 || sy > canvas.height) return;
     if (this.isLeaf() && colorMap[this.getValue() ?? -1] === "transparent") return;
 
-    if (camera.zoom * Math.pow(0.5, step) <= Math.min(canvas.width, canvas.height)) {
+    if (camera.zoom * window.devicePixelRatio * Math.pow(0.5, step) <= Math.min(canvas.width, canvas.height)) {
       if (this.image === null) this.draw(colorMap);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.image!, sx, sy, size, size);
@@ -539,9 +539,6 @@ export class Quadtree {
         ctx.strokeStyle = "red";
         ctx.lineWidth = window.devicePixelRatio;
         ctx.strokeRect(sx, sy, size, size);
-        if (this.image) {
-          console.log(this.image.width);
-        }
       }
 
       return;
