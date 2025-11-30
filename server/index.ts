@@ -479,4 +479,4 @@ wss.on('connection', (ws: WebSocket, req: any) => {
   });
 });
 
-console.log(`${getTimestamp()} WebSocket server is running on ws://localhost:${port}`);
+console.log(`${getTimestamp()} WebSocket server is running on :${port}`);

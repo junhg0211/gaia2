@@ -5,6 +5,7 @@
 </script>
 
 <svelte:head>
+  <meta http-equiv="content-security-policy" content="upgrade-insecure-requests">
 	<link rel="icon" href={favicon} />
   <title>Gaia 2</title>
   <style>
