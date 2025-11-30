@@ -11,9 +11,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Change directory to client site
-        run: cd client
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -21,15 +18,18 @@ jobs:
           version: 8
 
       - name: Install dependencies
+        working-directory: ./client
         run: pnpm install --frozen-lockfile
 
       - name: build
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
+        working-directory: ./client
         run: pnpm run build
 
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
+        working-directory: ./client
         with:
           path: 'build/'
 
