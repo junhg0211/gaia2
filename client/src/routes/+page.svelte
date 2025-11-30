@@ -939,6 +939,7 @@
     wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", "localhost") || 'localhost';
     if (!wsurl.startsWith("ws://")) wsurl = "ws://" + wsurl;
     if (!wsurl.match(/:\d+/)) wsurl += ":48829";
+    console.log(wsurl);
 
     socket = new WebSocket(wsurl);
 
