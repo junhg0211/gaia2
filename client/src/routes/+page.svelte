@@ -936,10 +936,11 @@
     window.addEventListener('wheel', onwheel);
 
     /* Initialize WebSocket */
-    wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", "localhost") || 'localhost';
-    if (!wsurl.startsWith("ws://")) wsurl = "ws://" + wsurl;
+    const defaultHost = 'localhost';
+    const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", defaultHost) || defaultHost;
+    if (!wsurl.startsWith('ws://') && !wsurl.startsWith('wss://')) wsurl = scheme + wsurl;
     if (!wsurl.match(/:\d+/)) wsurl += ":48829";
-    console.log(wsurl);
 
     socket = new WebSocket(wsurl);
 

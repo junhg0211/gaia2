@@ -1,10 +1,33 @@
 import WebSocket, { WebSocketServer } from 'ws';
 import { Map, Color, Layer, mapFromJSON } from "../dataframe.ts";
 import fs from 'fs';
+import https from 'https';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-/* server setup */
-const port = 48829;
-const host = "0.0.0.0";
+/* server setup (HTTPS for WSS) */
+const port = parseInt(process.env.PORT || '48829', 10);
+const host = process.env.HOST || "0.0.0.0";
+
+// TLS credentials: env vars or default local dev files
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const keyPath = process.env.TLS_KEY_PATH || path.join(__dirname, 'key.pem');
+const certPath = process.env.TLS_CERT_PATH || path.join(__dirname, 'cert.pem');
+
+let tlsOptions: { key?: Buffer; cert?: Buffer } = {};
+try {
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    tlsOptions = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath)
+    };
+  } else {
+    console.warn(`TLS key/cert not found. Expected at:\n  key: ${keyPath}\n  cert: ${certPath}`);
+  }
+} catch (err) {
+  console.error('Failed to read TLS credentials:', err);
+}
 
 let map = new Map();
 const mapPath = 'map.json';
@@ -446,7 +469,19 @@ function send(ws: WebSocket, message: string): void {
   ws.send(message);
 }
 
-const wss = new WebSocketServer({ port, host });
+// Create HTTPS server to enable WSS
+const httpsServer = https.createServer(tlsOptions, (_req, res) => {
+  // Optional: respond to health checks
+  res.writeHead(200);
+  res.end('OK');
+});
+
+httpsServer.listen(port, host, () => {
+  console.log(`${getTimestamp()} HTTPS server listening on https://${host}:${port}`);
+});
+
+// Attach WebSocketServer to HTTPS server (WSS)
+const wss = new WebSocketServer({ server: httpsServer });
 
 wss.on('connection', (ws: WebSocket, req: any) => {
   const remoteAddress = req.socket.remoteAddress;
@@ -479,4 +514,4 @@ wss.on('connection', (ws: WebSocket, req: any) => {
   });
 });
 
-console.log(`${getTimestamp()} WebSocket server is running on :${port}`);
+console.log(`${getTimestamp()} WSS server is running on wss://${host}:${port}`);
