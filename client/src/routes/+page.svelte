@@ -936,7 +936,7 @@
     window.addEventListener('wheel', onwheel);
 
     /* Initialize WebSocket */
-    const defaultHost = 'localhost';
+    const defaultHost = 'sch.shtelo.org';
     const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
     wsurl = prompt("웹소켓 서버 주소를 입력해주세요:", defaultHost) || defaultHost;
     if (!wsurl.startsWith('ws://') && !wsurl.startsWith('wss://')) wsurl = scheme + wsurl;
