@@ -490,11 +490,35 @@ export class Quadtree {
 
     const depth = this.getDepth();
 
+    if (depth <= 4) {
+      this.image = document.createElement("canvas");
+      this.image.width = 1 << depth;
+      this.image.height = 1 << depth;
+      const offscreenCtx: CanvasRenderingContext2D = this.image.getContext("2d")!;
+
+      const drawNode = (node: Quadtree, x: number, y: number, size: number) => {
+        if (node.isLeaf()) {
+          offscreenCtx.fillStyle = colorMap[node.getValue() ?? -1];
+          offscreenCtx.fillRect(x, y, size, size);
+          return;
+        }
+
+        const halfSize = size / 2;
+        if (node.children !== null) {
+          drawNode(node.getChild(0), x, y, halfSize);
+          drawNode(node.getChild(1), x + halfSize, y, halfSize);
+          drawNode(node.getChild(2), x, y + halfSize, halfSize);
+          drawNode(node.getChild(3), x + halfSize, y + halfSize, halfSize);
+        }
+      };
+      drawNode(this, 0, 0, 1 << depth);
+      return;
+    }
+
     if (this.children !== null)
       this.children.forEach(child => child.draw(colorMap));
 
     const imgSize = Math.min(1 << depth, 1 << 10);
-    this.image = null;
     this.image = document.createElement("canvas");
     this.image.width = imgSize;
     this.image.height = imgSize;
@@ -553,7 +577,8 @@ export class Quadtree {
     } else {
       if (this.image === null) this.draw(colorMap);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(this.image!, sx, sy, size, size);
+      ctx.fillStyle = colorMap[this.getValue() ?? -1];
+      ctx.fillRect(sx, sy, size, size);
       
       if (debug) {
         ctx.strokeStyle = "blue";
