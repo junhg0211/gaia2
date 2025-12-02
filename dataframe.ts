@@ -333,6 +333,15 @@ export class Quadtree {
       // Correct filter evaluation: check overlap of this node's region
       // against the other layer's quadtree without mutating either tree.
       const [rx0, ry0, rx1, ry1] = this.getBoundingBox();
+
+      // If polygon area is large, prefer precomputed region quadtree/mask
+      const polygonArea = Math.abs(
+        polygon.reduce((acc, [x, y], i) => {
+          const [nx, ny] = polygon[(i + 1) % polygon.length];
+          return acc + (x * ny - y * nx);
+        }, 0) / 2
+      );
+      const largePolygon = polygonArea > 0.1; // heuristic threshold in unit square
       // Per-operation cache for overlap queries keyed by layer+color+node
       const opCache = (Quadtree as any)._opCache as globalThis.Map<string, boolean> | undefined;
       if (!(Quadtree as any)._opCache) (Quadtree as any)._opCache = new globalThis.Map();
@@ -364,9 +373,22 @@ export class Quadtree {
       let possible = color.filterAts.length === 0;
       if (!possible && color.filterAts.length > 0) {
         const map = getMap(this.getLayer());
-        for (const filterAt of color.filterAts) {
-          const layer: Layer = map.getLayerByColorId(filterAt);
-          if (overlapsColorInRegion(layer.quadtree, filterAt, layer.id)) { possible = true; break; }
+        // Region cache keyed by filter set
+        const key = `filters:${color.filterAts.slice().sort((a,b)=>a-b).join(',')}`;
+        if (!(Map as any)._regionCache) (Map as any)._regionCache = new globalThis.Map();
+        const rcache: globalThis.Map<string, RegionQuadtree> = (Map as any)._regionCache;
+        let region = rcache.get(key);
+        if (largePolygon && !region) {
+          region = RegionQuadtree.buildFromFilters(map, color.filterAts);
+          rcache.set(key, region);
+        }
+        if (largePolygon && region) {
+          possible = region.overlaps(rx0, ry0, rx1, ry1);
+        } else {
+          for (const filterAt of color.filterAts) {
+            const layer: Layer = map.getLayerByColorId(filterAt);
+            if (overlapsColorInRegion(layer.quadtree, filterAt, layer.id)) { possible = true; break; }
+          }
         }
       }
 
@@ -808,6 +830,8 @@ export class Layer {
     this.children = layer.children;
     this.quadtree = layer.quadtree;
     this.opacity = layer.opacity;
+    // Invalidate precomputed region caches due to source layer mutation
+    getMap(this).clearRegionCache?.();
   }
 }
 
@@ -900,12 +924,68 @@ export class Map {
       size: this.size
     };
   }
+
+  /* region cache management */
+  clearRegionCache() {
+    if ((Map as any)._regionCache) {
+      (Map as any)._regionCache = new globalThis.Map();
+    }
+  }
 }
 
 function getMap(thing: Map | Layer): Map {
   if (thing instanceof Map)
     return thing;
   return getMap(thing.parent);
+}
+
+/* region precomputation */
+class RegionQuadtree {
+  private root: Quadtree;
+  private layerIds: number[];
+  private targetIds: Set<number>;
+
+  private constructor(root: Quadtree, layerIds: number[], targets: number[]) {
+    this.root = root;
+    this.layerIds = layerIds;
+    this.targetIds = new Set(targets);
+  }
+
+  static buildFromFilters(map: Map, filterAts: number[]): RegionQuadtree {
+    // Collect unique layers involved
+    const layerIds = Array.from(new Set(filterAts.map(id => map.getLayerByColorId(id).id)));
+    // Build a quadtree that marks regions where any target color appears
+    const root = new Quadtree(0, map.layer); // value is unused here
+    // We do not mutate source layers; we only compute overlaps lazily via DFS
+    const region = new RegionQuadtree(root, layerIds, filterAts);
+    return region;
+  }
+
+  overlaps(x0: number, y0: number, x1: number, y1: number): boolean {
+    // Evaluate overlap against all involved layers
+    const map = getMap(this.root.getLayer());
+    for (const layerId of this.layerIds) {
+      const layer = map.getLayerById(layerId)!;
+      // Check for any of targetIds present in region using DFS clip
+      const found = ((): boolean => {
+        const dfs = (n: Quadtree, nx0: number, ny0: number, nx1: number, ny1: number): boolean => {
+          if (nx1 <= x0 || nx0 >= x1 || ny1 <= y0 || ny0 >= y1) return false;
+          if (n.isLeaf()) return this.targetIds.has(n.getValue());
+          const midX = (nx0 + nx1) / 2;
+          const midY = (ny0 + ny1) / 2;
+          return (
+            dfs(n.getChild(0), nx0, ny0, midX, midY) ||
+            dfs(n.getChild(1), midX, ny0, nx1, midY) ||
+            dfs(n.getChild(2), nx0, midY, midX, ny1) ||
+            dfs(n.getChild(3), midX, midY, nx1, ny1)
+          );
+        };
+        return dfs(layer.quadtree, 0, 0, 1, 1);
+      })();
+      if (found) return true;
+    }
+    return false;
+  }
 }
 
 /* deserialization */

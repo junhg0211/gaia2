@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick, onMount, afterUpdate } from 'svelte';
   import type { Color as ColorClass } from '../../../../dataframe.js';
   import "bootstrap-icons/font/bootstrap-icons.css";
 
@@ -7,6 +8,12 @@
   export let selectedColor: ColorClass | null;
   export let selectColor: (c: ColorClass) => void;
   export let removeable: boolean = true;
+
+  // 전역 변수로 focus가 필요한 color id를 저장
+  let focusColorId: number | null = null;
+  if (typeof window !== 'undefined') {
+    (window as any).__focusColorId = (window as any).__focusColorId || null;
+  }
 
   function select() {
     selectColor(color);
@@ -37,14 +44,37 @@
     return selectedColor.id === color.id;
   }
 
-  function onFilterInputKeypress(event: KeyboardEvent) {
+  let inputEl: HTMLInputElement | null = null;
+
+  async function onFilterInputKeypress(event: KeyboardEvent) {
+    // 숫자, Enter, Backspace, Delete, Arrow keys만 허용
+    if (!/^\d$/.test(event.key) && !['Enter', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(event.key)) {
+      event.preventDefault();
+      return;
+    }
+
     if (event.key === "Enter") {
-      const input = event.target as HTMLInputElement;
-      const value = input.value;
+      event.preventDefault();
+      if (!inputEl) return;
+      const value = inputEl.value;
       socket.send(`addcolorfilter\t${color.id}\t${value}`);
-      input.value = "";
+      inputEl.value = "";
+      // 전역 변수에 현재 color id를 저장
+      if (typeof window !== 'undefined') {
+        (window as any).__focusColorId = color.id;
+      }
     }
   }
+
+  onMount(() => {
+    // 컴포넌트가 마운트될 때 이 color에 focus가 필요한지 확인
+    if (typeof window !== 'undefined' && (window as any).__focusColorId === color.id) {
+      setTimeout(() => {
+        inputEl?.focus();
+        (window as any).__focusColorId = null;
+      }, 0);
+    }
+  });
 </script>
 
 <div class="color-item" class:selected={isSelected()}>
@@ -60,7 +90,7 @@
             socket.send(`removecolorfilter\t${color.id}\t${filterAt}`);
           }}>{filterAt}</button>,
         {/each}
-        <input type="text" on:keypress={onFilterInputKeypress}>
+        <input type="text" bind:this={inputEl} on:keypress={onFilterInputKeypress}>
       </div>
     </div>
     <div class="color-actions">
