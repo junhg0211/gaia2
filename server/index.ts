@@ -204,6 +204,7 @@ const commands: Command[] = [
       if (!color) return;
       const parentLayer: Layer = color.parent;
       announce(`removecolor\t${colorId}`);
+      color.locked = false;
       parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
       parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
       console.log(`${getTimestamp()} Remove color ${color.id} (${color.name}) from layer ${parentLayer.id}`);

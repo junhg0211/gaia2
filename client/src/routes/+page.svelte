@@ -157,6 +157,7 @@
         const colorId = parseInt(args[0]);
         const color = map!.getColorById(colorId);
         if (!color) return;
+        color.locked = false;
         const parentLayer: LayerClass = color.parent;
         parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
         parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
