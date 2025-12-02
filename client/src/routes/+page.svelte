@@ -584,11 +584,17 @@
         if (!map) return;
         if (toolVar.startX === 0 && toolVar.startY === 0 && toolVar.mouseX === 0 && toolVar.mouseY === 0) return;
 
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
         const [startX, startY] = camera.worldToScreen(toolVar.startX, toolVar.startY);
         const [endX, endY] = camera.worldToScreen(toolVar.mouseX, toolVar.mouseY);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 * window.devicePixelRatio;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = window.devicePixelRatio;
+        ctx.beginPath();
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
@@ -596,8 +602,13 @@
         const dist = Math.hypot(toolVar.startX - toolVar.mouseX, toolVar.startY - toolVar.mouseY) * map.size;
         const midScreenX = (startX + endX) / 2;
         const midScreenY = (startY + endY) / 2;
+        ctx.font = `${8 * window.devicePixelRatio}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        const width = ctx.measureText(distanceString(dist)).width;
+        ctx.fillStyle = "black";
+        ctx.fillRect(midScreenX + 5 - width / 2, midScreenY - 20, width, 8 * window.devicePixelRatio);
         ctx.fillStyle = 'white';
-        ctx.font = '16px Arial';
         ctx.fillText(distanceString(dist), midScreenX + 5, midScreenY - 5);
       },
       onmousebuttonup: (e: MouseEvent) => {
