@@ -273,11 +273,16 @@
 
   let camera!: Camera;
 
-  function draw(): void {
-    if (!ctx) return;
+  function draw() {
     if (!map) return;
 
-    map.draw();
+    const drawRecursively = (layer: LayerClass) => {
+      layer.draw();
+      for (const child of layer.children) {
+        drawRecursively(child);
+      }
+    };
+    drawRecursively(map.layer);
   }
 
   function renderBackground() {
