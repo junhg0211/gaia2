@@ -4,16 +4,18 @@ import Camera from "./camera";
 export class Color {
   name: string;
   color: string;
-  parent: any;
+  parent: Layer;
   id: number;
   locked: boolean;
+  filterAts: number[];
 
-  constructor(name: string, color: string, parent: any) {
+  constructor(name: string, color: string, parent: Layer) {
     this.name = name;
     this.color = color;
     this.parent = parent;
     this.id = getMap(parent).getNextColorId();
     this.locked = false;
+    this.filterAts = [];
   }
 
   /* get layer */
@@ -28,6 +30,7 @@ export class Color {
       name: this.name,
       color: this.color,
       locked: this.locked,
+      filterAts: this.filterAts
     };
   }
 }
@@ -257,8 +260,28 @@ export class Quadtree {
     return [(x: number) => xer2(xer(x)), (y: number) => yer2(yer(y))];
   }
 
+  getAddressFromLayer() {
+    const layer = this.getLayer();
+    let x = 0, y = 0;
+    let depth = 0;
+    let node: Quadtree | Layer = this;
+    while (node instanceof Quadtree && node.parent instanceof Quadtree) {
+      const parent: Quadtree = node.parent;
+      const index = parent.children!.indexOf(node);
+      if (index === 1) x += Math.pow(2, depth);
+      if (index === 2) y += Math.pow(2, depth);
+      if (index === 3) {
+        x += Math.pow(2, depth);
+        y += Math.pow(2, depth);
+      }
+      depth++;
+      node = parent;
+    }
+    return { x, y, depth };
+  }
+
   /* image representation */
-  fillPolygon(polygon: [number, number][], value: number, depth: number) {
+  fillPolygon(polygon: [number, number][], color: Color, depth: number) {
     if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
 
     this.changes = true;
@@ -276,8 +299,41 @@ export class Quadtree {
     };
 
     if (depth <= 0 || depth === undefined) {
+      // Correct filter evaluation: check overlap of this node's region
+      // against the other layer's quadtree without mutating either tree.
+      const [rx0, ry0, rx1, ry1] = this.getBoundingBox();
+
+      const overlapsColorInRegion = (root: Quadtree, target: number): boolean => {
+        const dfs = (node: Quadtree, nx0: number, ny0: number, nx1: number, ny1: number): boolean => {
+          // No overlap
+          if (nx1 <= rx0 || nx0 >= rx1 || ny1 <= ry0 || ny0 >= ry1) return false;
+          // Leaf: region overlaps; return if matches target
+          if (node.isLeaf()) return node.getValue() === target;
+          // Recurse into children
+          const midX = (nx0 + nx1) / 2;
+          const midY = (ny0 + ny1) / 2;
+          return (
+            dfs(node.getChild(0), nx0, ny0, midX, midY) ||
+            dfs(node.getChild(1), midX, ny0, nx1, midY) ||
+            dfs(node.getChild(2), nx0, midY, midX, ny1) ||
+            dfs(node.getChild(3), midX, midY, nx1, ny1)
+          );
+        };
+        return dfs(root, 0, 0, 1, 1);
+      };
+
+      let possible = color.filterAts.length === 0;
+      if (!possible && color.filterAts.length > 0) {
+        const map = getMap(this.getLayer());
+        for (const filterAt of color.filterAts) {
+          const layer: Layer = map.getLayerByColorId(filterAt);
+          if (overlapsColorInRegion(layer.quadtree, filterAt)) { possible = true; break; }
+        }
+      }
+
+      if (!possible) return;
       const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
-      if (containsCenter) return this.setValue(value);
+      if (containsCenter) return this.setValue(color.id);
       else return;
     }
 
@@ -290,14 +346,14 @@ export class Quadtree {
     if (polygonMaxX <= 0 || polygonMinX >= 1 || polygonMaxY <= 0 || polygonMinY >= 1) return;
 
     this.subdivide();
-    this.getChild(0).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2]), value, depth - 1);
-    this.getChild(1).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2]), value, depth - 1);
-    this.getChild(2).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2 - 1]), value, depth - 1);
-    this.getChild(3).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2 - 1]), value, depth - 1);
+    this.getChild(0).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2]), color, depth - 1);
+    this.getChild(1).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2]), color, depth - 1);
+    this.getChild(2).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2 - 1]), color, depth - 1);
+    this.getChild(3).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2 - 1]), color, depth - 1);
     this.mergeIfPossible();
   }
 
-  fillCircle(x: number, y: number, radius: number, value: number, depth: number) {
+  fillCircle(x: number, y: number, radius: number, color: Color, depth: number) {
     if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
 
     this.changes = true;
@@ -306,7 +362,7 @@ export class Quadtree {
       const distance = Math.hypot(x - 0.5, y - 0.5);
       const containsCenter = distance <= radius;
 
-      if (containsCenter) return this.setValue(value);
+      if (containsCenter) return this.setValue(color.id);
       else return;
     }
 
@@ -325,13 +381,13 @@ export class Quadtree {
       Math.hypot(x - 0, y - 1),
       Math.hypot(x - 1, y - 1)
     );
-    if (maxDistance <= radius) return this.setValue(value);
+    if (maxDistance <= radius) return this.setValue(color.id);
 
     this.subdivide();
-    this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, value, depth - 1);
-    this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, value, depth - 1);
-    this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, value, depth - 1);
-    this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, value, depth - 1);
+    this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, color, depth - 1);
+    this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, color, depth - 1);
+    this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, color, depth - 1);
+    this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, color, depth - 1);
     this.mergeIfPossible();
   }
 
@@ -430,7 +486,7 @@ export class Quadtree {
     root.mergeIfPossible();
   }
 
-  drawLine(x0: number, y0: number, x1: number, y1: number, value: number, width: number, depth: number) {
+  drawLine(x0: number, y0: number, x1: number, y1: number, color: Color, width: number, depth: number) {
     const theta = Math.atan2(y1 - y0, x1 - x0);
     const halfWidth = width / 2;
     const corners: [number, number][] = [
@@ -439,9 +495,9 @@ export class Quadtree {
       [x1 + halfWidth * Math.cos(theta - Math.PI / 2), y1 + halfWidth * Math.sin(theta - Math.PI / 2)],
       [x1 + halfWidth * Math.cos(theta + Math.PI / 2), y1 + halfWidth * Math.sin(theta + Math.PI / 2)]
     ];
-    this.fillCircle(x0, y0, halfWidth, value, depth);
-    this.fillCircle(x1, y1, halfWidth, value, depth);
-    this.fillPolygon(corners, value, depth);
+    this.fillCircle(x0, y0, halfWidth, color, depth);
+    this.fillCircle(x1, y1, halfWidth, color, depth);
+    this.fillPolygon(corners, color, depth);
   }
 
   getValueAt(x: number, y: number): number | null {
@@ -618,7 +674,7 @@ export class Layer {
   constructor(name: string, parent: Map | Layer) {
     this.name = name;
     this.parent = parent;
-    this.colors = [new Color("Transparent", "transparent", this)];
+    this.colors = [new Color("공허", "transparent", this)];
     this.children = [];
     this.quadtree = new Quadtree(this.colors[0].id, this);
     this.id = getMap(parent).getNextLayerId();
@@ -657,6 +713,24 @@ export class Layer {
         return color;
     }
     throw new Error(`Color with id ${colorId} not found in layer ${this.name}.`);
+  }
+
+  getAddress(x: number, y: number) {
+    const node = this.quadtree;
+    let depth = 0;
+    let cx = x;
+    let cy = y;
+    while (node.isDivided()) {
+      const half = 1 << depth;
+      if (cx >= half) {
+        cx -= half;
+      }
+      if (cy >= half) {
+        cy -= half;
+      }
+      depth++;
+    }
+    return { x: cx, y: cy, depth };
   }
 
   /* draw on ctx */
@@ -741,6 +815,23 @@ export class Map {
     return searchLayerForColor(this.layer, colorId);
   }
 
+  getLayerByColorId(filterAt: number): Layer {
+    function searchLayerForColor(layer: Layer, colorId: number): Layer | null {
+      for (const color of layer.colors) {
+        if (color.id === colorId) return layer;
+      }
+      for (const childLayer of layer.children) {
+        const result = searchLayerForColor(childLayer, colorId);
+        if (result) return result;
+      }
+      return null;
+    }
+    const layer = searchLayerForColor(this.layer, filterAt);
+    if (layer === null)
+      throw new Error(`Color with id ${filterAt} not found in any layer.`);
+    return layer;
+  }
+
   /* image rendering */
   draw() {
     this.layer.draw();
@@ -787,10 +878,11 @@ export function mapFromJSON(json: any): Map {
 export function layerFromJSON(json: any, parent: Map | Layer): Layer {
   const layer = new Layer(json.name, parent);
   layer.id = json.id;
-  layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; locked: boolean }) => {
+  layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; locked: boolean; filterAts: number[] }) => {
     const color = new Color(colorJson.name, colorJson.color, layer);
     color.id = colorJson.id;
     color.locked = colorJson.locked;
+    color.filterAts = colorJson.filterAts || [];
     return color;
   });
   layer.quadtree = quadtreeFromJSON(json.quadtree, layer);

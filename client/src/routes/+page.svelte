@@ -73,7 +73,7 @@
         const layer = map!.layer;
         const color = map!.getColorById(colorId);
         if (!color) return;
-        layer.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
+        layer.quadtree.drawLine(x0, y0, x1, y1, color, brushSize, depth);
         render();
       }
     },
@@ -95,7 +95,7 @@
           return [parseFloat(xStr), parseFloat(yStr)];
         });
 
-        layer.quadtree.fillPolygon(polygon, color.id, depth);
+        layer.quadtree.fillPolygon(polygon, color, depth);
         layer.draw();
         render();
       }
@@ -146,6 +146,7 @@
         const color = map!.getColorById(colorId);
         if (!color) return;
         color.color = newColorValue;
+        color.getLayer().draw();
         rerender();
         render();
       }
@@ -238,6 +239,29 @@
         if (!map) return;
         map.size = newSize;
         render();
+      }
+    },
+    {
+      prefix: "addcolorfilter",
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const filterAt = parseInt(args[1]);
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        if (color.filterAts.includes(filterAt)) return;
+        color.filterAts.push(filterAt);
+        rerender();
+      },
+    },
+    {
+      prefix: "removecolorfilter",
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const filterAt = parseInt(args[1]);
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        color.filterAts = color.filterAts.filter(v => v !== filterAt);
+        rerender();
       }
     }
   ];
@@ -1162,7 +1186,7 @@
   }
 
   /* title */
-  $: title = `Gaia 2${socket ? ` :: ${wsurl?.replaceAll(/^(wss?|https?):\/\/|:48829$/, '')}` : ""}`;
+  $: title = `Gaia 2${socket ? ` :: ${wsurl?.replaceAll(/^(wss?|https?):\/\/|:48829$/g, '')}` : ""}`;
 </script>
 
 <svelte:head>
@@ -1204,6 +1228,9 @@
       {#if socket}
         <button on:click={saveMap}>저장</button>
         <button on:click={reloadMap}>새로고침</button>
+      {/if}
+      {#if map}
+        <button on:click={draw}>그리기</button>
       {/if}
       <button on:click={loadImage}>이미지 불러오기</button>
       <button on:click={saveImage}>이미지 저장하기</button>

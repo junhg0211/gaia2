@@ -110,7 +110,7 @@ const commands: Command[] = [
       const color = map.getColorById(colorId);
       if (!color) return;
       announce(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${brushSize}\t${colorId}\t${depth}`);
-      color.parent.quadtree.drawLine(x0, y0, x1, y1, color.id, brushSize, depth);
+      color.parent.quadtree.drawLine(x0, y0, x1, y1, color, brushSize, depth);
     }
   },
   {
@@ -160,7 +160,7 @@ const commands: Command[] = [
 
       const polygonString = polygon.map(([x, y]) => `${x},${y}`).join(';');
       announce(`fillpolygon\t${layerId}\t${polygonString}\t${colorId}\t${depth}`);
-      layer.quadtree.fillPolygon(polygon, color.id, depth);
+      layer.quadtree.fillPolygon(polygon, color, depth);
     }
   },
   {
@@ -449,6 +449,33 @@ const commands: Command[] = [
       const layer = map.getLayerById(layerId);
       if (!layer) return;
       announce(`draw\t${layerId}`);
+    }
+  },
+  {
+    prefix: "addcolorfilter",
+    action: (announce, send, content, args) => {
+      const [rawColorId, rawValue] = args;
+      const colorId = parseInt(rawColorId);
+      const value = parseInt(rawValue);
+
+      const color = map.getColorById(colorId);;
+      if (!color) return;
+      if (color.filterAts.includes(value)) return;
+      color.filterAts.push(value);
+      announce(`addcolorfilter\t${colorId}\t${value}`);
+    }
+  },
+  {
+    prefix: "removecolorfilter",
+    action: (announce, send, content, args) => {
+      const [rawColorId, rawValue] = args;
+      const colorId = parseInt(rawColorId);
+      const value = parseInt(rawValue);
+
+      const color = map.getColorById(colorId);;
+      if (!color) return;
+      color.filterAts = color.filterAts.filter(v => v !== value);
+      announce(`removecolorfilter\t${colorId}\t${value}`);
     }
   }
 ]

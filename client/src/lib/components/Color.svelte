@@ -36,16 +36,34 @@
 
     return selectedColor.id === color.id;
   }
+
+  function onFilterInputKeypress(event: KeyboardEvent) {
+    if (event.key === "Enter") {
+      const input = event.target as HTMLInputElement;
+      const value = input.value;
+      socket.send(`addcolorfilter\t${color.id}\t${value}`);
+      input.value = "";
+    }
+  }
 </script>
 
-<div
-  class="color-item"
-  class:selected={isSelected()}
->
+<div class="color-item" class:selected={isSelected()}>
   <div class="color-name">
-    <button on:click={select} on:dblclick={renameColor} class="color-button">
-      <span style="color: {color.color};">&#x25CF;</span> {color.name} #{color.id}
-    </button>
+    <div class="color-info">
+      <button on:click={select} on:dblclick={renameColor} class="color-button" style="color: {color.color};">
+        &#x25CF; {color.name}
+      </button>
+      <div class="color-id">
+        #{color.id} |
+        {#each color.filterAts as filterAt}
+          <button on:click={() => {
+            socket.send(`removecolorfilter\t${color.id}\t${filterAt}`);
+          }}>{filterAt}</button>,
+        {/each}
+        <input type="text" on:keypress={onFilterInputKeypress}>
+      </div>
+    </div>
+    <div class="color-actions">
     <button on:click={toggleLock} class="button" class:locked={color.locked} aria-label="lock">
       <i class="bi bi-lock"></i>
     </button>
@@ -54,6 +72,7 @@
         <i class="bi bi-trash"></i>
       </button>
     {/if}
+    </div>
   </div>
 </div>
 
@@ -84,6 +103,7 @@
 
   .color-button {
     font-size: 14px;
+    text-shadow: 0 0 0 #f7f7f9;
   }
 
   .button {
@@ -92,5 +112,36 @@
 
   .locked {
     color: #ffcc00;
+  }
+
+  .color-name {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .color-info {
+    flex: 1;
+  }
+
+  .color-id {
+    font-size: 10px;
+    color: #aaaaaa;
+    margin-left: 8px;
+  }
+
+  .color-id input[type="text"] {
+    width: 20px;
+    background: none;
+    border: none;
+    color: #aaaaaa;
+    font-size: 10px;
+    border-bottom: 0.5px dashed #aaaaaa;
+    transition: all 0.2s;
+  }
+
+  .color-id input[type="text"]:focus {
+    outline: none;
+    border-bottom: 0.5px solid #ffffff;
   }
 </style>
