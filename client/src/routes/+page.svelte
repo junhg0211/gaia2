@@ -1160,10 +1160,13 @@
     link.click();
     document.body.removeChild(link);
   }
+
+  /* title */
+  $: title = `Gaia 2${socket ? ` :: ${wsurl?.replaceAll(/^(wss?|https?):\/\/|:48829$/, '')}` : ""}`;
 </script>
 
 <svelte:head>
-  <title>Gaia 2 :: {wsurl}</title>
+  <title>{title}</title>
 </svelte:head>
 
 <div class="main-container">
