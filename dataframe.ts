@@ -341,7 +341,7 @@ export class Quadtree {
           return acc + (x * ny - y * nx);
         }, 0) / 2
       );
-      const largePolygon = polygonArea > 0.1; // heuristic threshold in unit square
+      const largePolygon = polygonArea > 0.05; // heuristic threshold in unit square
       // Per-operation cache for overlap queries keyed by layer+color+node
       const opCache = (Quadtree as any)._opCache as globalThis.Map<string, boolean> | undefined;
       if (!(Quadtree as any)._opCache) (Quadtree as any)._opCache = new globalThis.Map();
