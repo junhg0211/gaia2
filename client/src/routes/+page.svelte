@@ -292,14 +292,18 @@
     if (!map) return;
 
     const preferredGridSizeInPixels = 300 * window.devicePixelRatio;
-    let gridUnit = 1000;
+    let gridUnit = 10000000000 / map.size;
+    let gridUnitHelper = 1;
     while (gridUnit * camera.zoom > preferredGridSizeInPixels) {
-      if (gridUnit.toString().endsWith('1')) {
+      if (gridUnitHelper === 1) {
         gridUnit /= 2;
-      } else if (gridUnit.toString().endsWith('5')) {
+        gridUnitHelper = 5;
+      } else if (gridUnitHelper === 5) {
         gridUnit /= 2.5;
+        gridUnitHelper = 2;
       } else {
         gridUnit /= 2;
+        gridUnitHelper = 1;
       }
     }
     const gridSize = gridUnit * camera.zoom;
