@@ -11,7 +11,7 @@
   <style>
     @font-face {
       font-family: 'unifont';
-      src: url("/fonts/unifont-17.0.03.otf") format('truetype');
+      src: url("./fonts/unifont-17.0.03.otf") format('truetype');
       font-weight: normal;
       font-style: normal;
     }
