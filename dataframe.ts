@@ -8,6 +8,8 @@ export class Color {
   id: number;
   locked: boolean;
   filterAts: number[];
+  // Cache for mapping filter colorId -> owning Layer
+  private _filterLayerCache?: globalThis.Map<number, Layer>;
 
   constructor(name: string, color: string, parent: Layer) {
     this.name = name;
@@ -33,6 +35,16 @@ export class Color {
       filterAts: this.filterAts
     };
   }
+
+  // Resolve and cache owning layer for a filter color id
+  getFilterLayer(filterAt: number): Layer {
+    if (!this._filterLayerCache) this._filterLayerCache = new globalThis.Map();
+    const cached = this._filterLayerCache.get(filterAt);
+    if (cached) return cached;
+    const layer = getMap(this.parent).getLayerByColorId(filterAt);
+    this._filterLayerCache.set(filterAt, layer);
+    return layer;
+  }
 }
 
 export class Quadtree {
@@ -41,6 +53,8 @@ export class Quadtree {
   parent: Quadtree | Layer;
   image: HTMLCanvasElement | null; 
   changes: boolean;
+  // Memoized bounding box for this node
+  private _bbox?: [number, number, number, number];
 
   constructor(value: number | null, parent: Quadtree | Layer) {
     this.value = value;
@@ -186,8 +200,10 @@ export class Quadtree {
 
   private getBoundingBox(): [number, number, number, number] {
     // Returns [x0, y0, x1, y1] of this node relative to root
+    if (this._bbox) return this._bbox;
     if (!(this.parent instanceof Quadtree)) {
-      return [0, 0, 1, 1];
+      this._bbox = [0, 0, 1, 1];
+      return this._bbox;
     }
     
     const [px0, py0, px1, py1] = this.parent.getBoundingBox();
@@ -195,12 +211,12 @@ export class Quadtree {
     const midY = (py0 + py1) / 2;
     
     const index = this.parent.children!.indexOf(this);
-    if (index === 0) return [px0, py0, midX, midY];
-    if (index === 1) return [midX, py0, px1, midY];
-    if (index === 2) return [px0, midY, midX, py1];
-    if (index === 3) return [midX, midY, px1, py1];
-    
-    throw new Error("Node not found in parent's children");
+    if (index === 0) this._bbox = [px0, py0, midX, midY];
+    else if (index === 1) this._bbox = [midX, py0, px1, midY];
+    else if (index === 2) this._bbox = [px0, midY, midX, py1];
+    else if (index === 3) this._bbox = [midX, midY, px1, py1];
+    else throw new Error("Node not found in parent's children");
+    return this._bbox;
   }
 
   expandQuadtrants(x: number, y: number, placeholder: number): [(x: number) => number, (y: number) => number] {
@@ -265,19 +281,30 @@ export class Quadtree {
     let x = 0, y = 0;
     let depth = 0;
     let node: Quadtree | Layer = this;
+    const path = [];
     while (node instanceof Quadtree && node.parent instanceof Quadtree) {
       const parent: Quadtree = node.parent;
       const index = parent.children!.indexOf(node);
-      if (index === 1) x += Math.pow(2, depth);
-      if (index === 2) y += Math.pow(2, depth);
+      if (index === 0) {
+        path.push(0);
+      }
+      if (index === 1) {
+        path.push(1);
+        x += Math.pow(2, depth);
+      }
+      if (index === 2) {
+        path.push(2);
+        y += Math.pow(2, depth);
+      }
       if (index === 3) {
+        path.push(3);
         x += Math.pow(2, depth);
         y += Math.pow(2, depth);
       }
       depth++;
       node = parent;
     }
-    return { x, y, depth };
+    return { x, y, depth, path: path.reverse() };
   }
 
   /* image representation */
@@ -299,27 +326,39 @@ export class Quadtree {
     };
 
     if (depth <= 0 || depth === undefined) {
+      // Quick reject: if polygon center not inside, skip costly filter evaluation
+      const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
+      if (!containsCenter) return;
+
       // Correct filter evaluation: check overlap of this node's region
       // against the other layer's quadtree without mutating either tree.
       const [rx0, ry0, rx1, ry1] = this.getBoundingBox();
+      // Per-operation cache for overlap queries keyed by layer+color+node
+      const opCache = (Quadtree as any)._opCache as globalThis.Map<string, boolean> | undefined;
+      if (!(Quadtree as any)._opCache) (Quadtree as any)._opCache = new globalThis.Map();
+      const cache: globalThis.Map<string, boolean> = (Quadtree as any)._opCache;
 
-      const overlapsColorInRegion = (root: Quadtree, target: number): boolean => {
-        const dfs = (node: Quadtree, nx0: number, ny0: number, nx1: number, ny1: number): boolean => {
-          // No overlap
+      const overlapsColorInRegion = (root: Quadtree, target: number, layerId: number): boolean => {
+        const key = `${layerId}:${target}:${rx0},${ry0},${rx1},${ry1}`;
+        const cached = cache.get(key);
+        if (cached !== undefined) return cached;
+
+        // DFS from root with region clipping to avoid relying on path
+        const dfs = (n: Quadtree, nx0: number, ny0: number, nx1: number, ny1: number): boolean => {
           if (nx1 <= rx0 || nx0 >= rx1 || ny1 <= ry0 || ny0 >= ry1) return false;
-          // Leaf: region overlaps; return if matches target
-          if (node.isLeaf()) return node.getValue() === target;
-          // Recurse into children
+          if (n.isLeaf()) return n.getValue() === target;
           const midX = (nx0 + nx1) / 2;
           const midY = (ny0 + ny1) / 2;
           return (
-            dfs(node.getChild(0), nx0, ny0, midX, midY) ||
-            dfs(node.getChild(1), midX, ny0, nx1, midY) ||
-            dfs(node.getChild(2), nx0, midY, midX, ny1) ||
-            dfs(node.getChild(3), midX, midY, nx1, ny1)
+            dfs(n.getChild(0), nx0, ny0, midX, midY) ||
+            dfs(n.getChild(1), midX, ny0, nx1, midY) ||
+            dfs(n.getChild(2), nx0, midY, midX, ny1) ||
+            dfs(n.getChild(3), midX, midY, nx1, ny1)
           );
         };
-        return dfs(root, 0, 0, 1, 1);
+        const result = dfs(root, 0, 0, 1, 1);
+        cache.set(key, result);
+        return result;
       };
 
       let possible = color.filterAts.length === 0;
@@ -327,14 +366,13 @@ export class Quadtree {
         const map = getMap(this.getLayer());
         for (const filterAt of color.filterAts) {
           const layer: Layer = map.getLayerByColorId(filterAt);
-          if (overlapsColorInRegion(layer.quadtree, filterAt)) { possible = true; break; }
+          if (overlapsColorInRegion(layer.quadtree, filterAt, layer.id)) { possible = true; break; }
         }
       }
 
       if (!possible) return;
-      const containsCenter = polygonContainsPoint(0.5, 0.5, polygon);
-      if (containsCenter) return this.setValue(color.id);
-      else return;
+      // Center already checked at start
+      return this.setValue(color.id);
     }
 
     /* check if polygon is completely outside this quadtree node */
@@ -720,17 +758,22 @@ export class Layer {
     let depth = 0;
     let cx = x;
     let cy = y;
+    const path = [];
     while (node.isDivided()) {
       const half = 1 << depth;
+      let quadrant = 0;
       if (cx >= half) {
         cx -= half;
+        quadrant += 1;
       }
       if (cy >= half) {
         cy -= half;
+        quadrant += 2;
       }
       depth++;
+      path.push(quadrant);
     }
-    return { x: cx, y: cy, depth };
+    return { x: cx, y: cy, depth, path };
   }
 
   /* draw on ctx */

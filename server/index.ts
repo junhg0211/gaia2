@@ -4,6 +4,7 @@ import fs from 'fs';
 import https from 'https';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { get } from 'http';
 
 /* server setup (HTTPS for WSS) */
 const port = parseInt(process.env.PORT || '48829', 10);
@@ -61,6 +62,7 @@ const commands: Command[] = [
       const color = new Color(colorName, colorValue, layer);
       announce(`newcolor\t${layer.id}\t${colorName}\t${colorValue}`);
       layer.addColor(color);
+      console.log(`${getTimestamp()} New color created: ${color.id} (${color.name}, ${color.color}) in layer ${layer.id}`);
     }
   },
   {
@@ -74,6 +76,7 @@ const commands: Command[] = [
       const newLayer = new Layer(layerName, parentLayer);
       announce(`newlayer\t${parentLayer.id}\t${layerName}`);
       parentLayer.children.push(newLayer);
+      console.log(`${getTimestamp()} New layer created: ${newLayer.id} (${newLayer.name}) under layer ${parentLayer.id}`);
     }
   },
   {
@@ -111,6 +114,7 @@ const commands: Command[] = [
       if (!color) return;
       announce(`drawline\t${x0}\t${y0}\t${x1}\t${y1}\t${brushSize}\t${colorId}\t${depth}`);
       color.parent.quadtree.drawLine(x0, y0, x1, y1, color, brushSize, depth);
+      console.log(`${getTimestamp()} Draw line on color ${color.id} (${color.name}) in layer ${color.parent.id}: (${x0}, ${y0}) to (${x1}, ${y1}), brush size ${brushSize}, depth ${depth}`);
     }
   },
   {
@@ -161,6 +165,7 @@ const commands: Command[] = [
       const polygonString = polygon.map(([x, y]) => `${x},${y}`).join(';');
       announce(`fillpolygon\t${layerId}\t${polygonString}\t${colorId}\t${depth}`);
       layer.quadtree.fillPolygon(polygon, color, depth);
+      console.log(`${getTimestamp()} Fill polygon on color ${color.id} (${color.name}) in layer ${layer.id}: [${polygonString}], depth ${depth}`);
     }
   },
   {
@@ -173,6 +178,7 @@ const commands: Command[] = [
       if (!color) return;
       announce(`renamecolor\t${colorId}\t${newName}`);
       color.name = newName;
+      console.log(`${getTimestamp()} Rename color ${color.id} to ${newName} in layer ${color.parent.id}`);
     }
   },
   {
@@ -185,6 +191,7 @@ const commands: Command[] = [
       if (!color) return;
       announce(`changecolor\t${colorId}\t${newColorValue}`);
       color.color = newColorValue;
+      console.log(`${getTimestamp()} Change color ${color.id} to ${newColorValue} in layer ${color.parent.id}`);
     }
   },
   {
@@ -199,6 +206,7 @@ const commands: Command[] = [
       announce(`removecolor\t${colorId}`);
       parentLayer.quadtree.removeColor(colorId, parentLayer.colors[0]?.id || 1);
       parentLayer.colors = parentLayer.colors.filter(c => c.id !== colorId);
+      console.log(`${getTimestamp()} Remove color ${color.id} (${color.name}) from layer ${parentLayer.id}`);
     }
   },
   {
@@ -206,6 +214,7 @@ const commands: Command[] = [
     action: (announce, send, content, args) => {
       const mapJSON = JSON.stringify(map.toJSON());
       fs.writeFileSync(mapPath, mapJSON);
+      console.log(`${getTimestamp()} Map saved to ${mapPath}`);
     }
   },
   {
@@ -217,6 +226,7 @@ const commands: Command[] = [
       if (!layer) return;
       announce(`renamelayer\t${layerId}\t${newName}`);
       layer.name = newName;
+      console.log(`${getTimestamp()} Rename layer ${layer.id} to ${newName}`);
     }
   },
   {
@@ -230,6 +240,7 @@ const commands: Command[] = [
       const parentLayer = layer.parent as Layer;
       announce(`removelayer\t${layerId}`);
       parentLayer.children = parentLayer.children.filter(l => l.id !== layerId);
+      console.log(`${getTimestamp()} Remove layer ${layer.id} from parent layer ${parentLayer.id}`);
     }
   },
   {
@@ -243,6 +254,7 @@ const commands: Command[] = [
       if (!color) return;
       announce(`setcolorlock\t${colorId}\t${locked ? 1 : 0}`);
       color.locked = locked;
+      console.log(`${getTimestamp()} Set color lock ${color.id} (${color.name}) in layer ${color.parent.id} to ${locked}`);
     }
   },
   {
@@ -261,6 +273,7 @@ const commands: Command[] = [
 
       announce(`fill\t${layerId}\t${x}\t${y}\t${colorId}`);
       layer.quadtree.floodFill(x, y, color.id);
+      console.log(`${getTimestamp()} Fill on color ${color.id} (${color.name}) in layer ${layer.id} at (${x}, ${y})`);
     }
   },
   {
@@ -281,6 +294,7 @@ const commands: Command[] = [
       const newSize = parseFloat(rawSize);
       announce(`setmapsize\t${newSize}`);
       map.size = newSize;
+      console.log(`${getTimestamp()} Set map size to ${newSize}`);
     }
   },
   {
@@ -433,9 +447,9 @@ const commands: Command[] = [
       const totalPixels = pixelData.length * pixelData[0].length;
       const adaptiveThreshold = Math.sqrt(totalPixels) * 0.001; // Lower value = more detail preserved
       
-      console.log(`Starting quadtree compression with threshold ${adaptiveThreshold}`);
+      console.log(`${getTimestamp()} Starting compression with adaptive threshold: ${adaptiveThreshold}`);
       compressRegion({ x: 0, y: 0, w: pixelData[0].length, h: pixelData.length }, adaptiveThreshold);
-      console.log(`Compression complete`);
+      console.log(`${getTimestamp()} Compression complete`);
 
       announce(`map\t${JSON.stringify(map.toJSON())}`);
     }
@@ -461,8 +475,9 @@ const commands: Command[] = [
       const color = map.getColorById(colorId);;
       if (!color) return;
       if (color.filterAts.includes(value)) return;
-      color.filterAts.push(value);
       announce(`addcolorfilter\t${colorId}\t${value}`);
+      color.filterAts.push(value);
+      console.log(`${getTimestamp()} Add color filter ${value} to color ${color.id} (${color.name}) in layer ${color.parent.id}`);
     }
   },
   {
@@ -474,8 +489,9 @@ const commands: Command[] = [
 
       const color = map.getColorById(colorId);;
       if (!color) return;
-      color.filterAts = color.filterAts.filter(v => v !== value);
       announce(`removecolorfilter\t${colorId}\t${value}`);
+      color.filterAts = color.filterAts.filter(v => v !== value);
+      console.log(`${getTimestamp()} Remove color filter ${value} from color ${color.id} (${color.name}) in layer ${color.parent.id}`);
     }
   }
 ]
