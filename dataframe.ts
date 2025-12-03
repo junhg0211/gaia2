@@ -34,7 +34,8 @@ export class Color {
       name: this.name,
       color: this.color,
       locked: this.locked,
-      filterAts: this.filterAts
+      filterAts: this.filterAts,
+      labelPosition: this.labelPosition
     };
   }
 
