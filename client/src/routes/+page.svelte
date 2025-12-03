@@ -552,6 +552,83 @@
   };
   const tools: Tool[] = [
     {
+      name: "다각형 넓이 계산",
+      shortcut: 's',
+      icon: 'triangle',
+      onstart: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'crosshair';
+        toolVar.polygon = [];
+        render();
+      },
+      onend: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'default';
+      },
+      onmousebuttonup: (e: MouseEvent) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (e.button !== 0) return;
+        if (keys.has(" ")) return;
+
+        const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
+        toolVar.polygon.push([wx, wy]);
+        render();
+      },
+      onrender: () => {
+        if (!ctx) return;
+        if (!map) return;
+        if (toolVar.polygon.length === 0) return;
+
+        const [startX, startY] = camera.worldToScreen(toolVar.polygon[0][0], toolVar.polygon[0][1]);
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 * window.devicePixelRatio;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        for (let i = 1; i < toolVar.polygon.length; i++) {
+          const [sx, sy] = camera.worldToScreen(toolVar.polygon[i][0], toolVar.polygon[i][1]);
+          ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1 * window.devicePixelRatio;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        for (let i = 1; i < toolVar.polygon.length; i++) {
+          const [sx, sy] = camera.worldToScreen(toolVar.polygon[i][0], toolVar.polygon[i][1]);
+          ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        /* area calculation */
+        if (toolVar.polygon.length >= 2) {
+          let area = 0;
+          for (let i = 0; i < toolVar.polygon.length; i++) {
+            const [x1, y1] = toolVar.polygon[i];
+            const [x2, y2] = toolVar.polygon[(i + 1) % toolVar.polygon.length];
+            area += x1 * y2 - x2 * y1;
+          }
+          area = Math.abs(area) / 2 * map.size * map.size / 1000000;
+          const areaText = area <= 1000000 ? area.toFixed(2) + " m²" : (area / 1000000).toFixed(2) + " km²";
+
+          const midScreenX = (camera.worldToScreen(toolVar.polygon[0][0], toolVar.polygon[0][1])[0] + mouse.x) / 2;
+          const midScreenY = (camera.worldToScreen(toolVar.polygon[0][0], toolVar.polygon[0][1])[1] + mouse.y) / 2;
+          ctx.font = `${8 * window.devicePixelRatio}px Arial`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          const width = ctx.measureText(areaText).width;
+          ctx.fillStyle = "black";
+          ctx.fillRect(midScreenX + 5 - width / 2, midScreenY - 20, width, 8 * window.devicePixelRatio);
+          ctx.fillStyle = 'white';
+          ctx.fillText(areaText, midScreenX + 5, midScreenY - 5);
+        }
+      },
+    },
+    {
       name: '자',
       shortcut: 'r',
       icon: 'arrows',
