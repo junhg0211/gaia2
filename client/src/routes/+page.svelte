@@ -264,6 +264,18 @@
         color.filterAts = color.filterAts.filter(v => v !== filterAt);
         rerender();
       }
+    },
+    {
+      prefix: "setlabelpos",
+      action: (_send, args) => {
+        const colorId = parseInt(args[0]);
+        const x = parseFloat(args[1]);
+        const y = parseFloat(args[2]);
+        const color = map!.getColorById(colorId);
+        if (!color) return;
+        color.labelPosition = { x, y };
+        render();
+      }
     }
   ];
 
@@ -716,6 +728,24 @@
         const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
         socket.send(`fill\t${selectedColor.getLayer().id}\t${wx}\t${wy}\t${selectedColor.id}`)
         render();
+      },
+    },
+    {
+      name: "영역 레이블 위치 설정",
+      shortcut: 't',
+      icon: 'tag',
+      onmousebuttonup: (e: MouseEvent) => {
+        if (!ctx) return;
+        if (!map) return;
+        if (!selectedColor) return;
+
+        if (e.button === 2) {
+          socket.send(`setlabelpos\t${selectedColor.id}\t0\t0`);
+          return;
+        }
+
+        const [wx, wy] = camera.screenToWorld(mouse.x, mouse.y);
+        socket.send(`setlabelpos\t${selectedColor.id}\t${wx}\t${wy}`);
       },
     },
     {

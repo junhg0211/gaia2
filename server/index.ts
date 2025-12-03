@@ -494,6 +494,21 @@ const commands: Command[] = [
       color.filterAts = color.filterAts.filter(v => v !== value);
       console.log(`${getTimestamp()} Remove color filter ${value} from color ${color.id} (${color.name}) in layer ${color.parent.id}`);
     }
+  },
+  {
+    prefix: "setlabelpos",
+    action: (announce, send, content, args) => {
+      const [rawColorId, rawX, rawY] = args;
+      const colorId = parseInt(rawColorId);
+      const x = parseFloat(rawX);
+      const y = parseFloat(rawY);
+
+      const color = map.getColorById(colorId);
+      if (!color) return;
+      color.labelPosition = { x, y };
+      announce(`setlabelpos\t${colorId}\t${x}\t${y}`);
+      console.log(`${getTimestamp()} Set label position for color ${color.id} (${color.name}) in layer ${color.parent.id} to (${x}, ${y})`);
+    }
   }
 ]
 

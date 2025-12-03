@@ -8,6 +8,7 @@ export class Color {
   id: number;
   locked: boolean;
   filterAts: number[];
+  labelPosition: { x: number; y: number };
   // Cache for mapping filter colorId -> owning Layer
   private _filterLayerCache?: globalThis.Map<number, Layer>;
 
@@ -18,6 +19,7 @@ export class Color {
     this.id = getMap(parent).getNextColorId();
     this.locked = false;
     this.filterAts = [];
+    this.labelPosition = { x: 0, y: 0 };
   }
 
   /* get layer */
@@ -812,6 +814,38 @@ export class Layer {
     }
   }
 
+  renderLabels(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
+    ctx.font = "16px Arial";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    for (const color of this.colors) {
+      if (color.labelPosition === null) continue;
+      if (color.labelPosition.x <= 0 || color.labelPosition.x > 1 ||
+          color.labelPosition.y <= 0 || color.labelPosition.y > 1) continue;
+
+      const [x, y] = camera.worldToScreen(color.labelPosition.x, color.labelPosition.y);
+
+      ctx.fillStyle = "black";
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.closePath();
+
+      ctx.fillStyle = color.color;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.closePath();
+
+      ctx.fillStyle = "black";
+      const textWidth = ctx.measureText(color.name).width;
+      ctx.fillRect(x + 10, y - 10, textWidth + 5, 20);
+
+      ctx.fillStyle = "white";
+      ctx.fillText(color.name, x + 10, y);
+    }
+  }
+
   /* serialization */
   toJSON(): { id: number; name: string; colors: any[]; quadtree: any; children: any[] } {
     return {
@@ -906,6 +940,14 @@ export class Map {
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
     this.layer.render(ctx, camera, canvas);
+
+    const renderLabels = (layer: Layer) => {
+      layer.renderLabels(ctx, camera, canvas);
+      for (const child of layer.children) {
+        renderLabels(child);
+      }
+    };
+    renderLabels(this.layer);
   }
 
   renderToImage(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, width: number, height: number) {
