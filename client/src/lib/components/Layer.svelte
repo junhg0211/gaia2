@@ -32,7 +32,6 @@
     render();
   }
 
-
   function renameLayer(event: MouseEvent) {
     const newName = prompt("새로운 레이어 이름을 입력하세요:", layer.name);
     if (!newName) return;
@@ -48,6 +47,8 @@
 <div class="layer-item">
   <div>
     <button class="layer-name" on:click={renameLayer}>{layer.name}</button>
+    <input type="checkbox" bind:checked={layer.showDetails} title="Toggle Layer Folded" />
+    <input type="checkbox" bind:checked={layer.showColors} title="Toggle Layer Color Folded" />
     {#if removeable}
       <button on:click={removeLayer} class="delete-button" aria-label="rename">
         <i class="bi bi-trash"></i>
@@ -57,26 +58,30 @@
   <div class="layer-opacity">
     <input type="range" min="0" max="100" value={layer.opacity * 100} on:input={setOpacity} />
   </div>
-  <div class="layer-colors">
-    {#each layer.colors as color}
-      <ColorComponent {socket} {color} {selectedColor} {selectColor} removeable={color !== layer.colors[0]} />
-    {/each}
-    <div class="color-button">
-      <button on:click={newColor}>
-        <i class="bi bi-plus-lg"></i> Add Color
-      </button>
+  {#if layer.showColors}
+    <div class="layer-colors">
+      {#each layer.colors as color}
+        <ColorComponent {socket} {color} {selectedColor} {selectColor} removeable={color !== layer.colors[0]} />
+      {/each}
+      <div class="color-button">
+        <button on:click={newColor}>
+          <i class="bi bi-plus-lg"></i> Add Color
+        </button>
+      </div>
     </div>
-  </div>
-  <div class="layer-children">
-    {#each layer.children as child}
-      <Layer layer={child} {socket} {selectedColor} {selectColor} {rerender} {render} />
-    {/each}
-    <div class="color-button">
-      <button on:click={newLayer}>
-        <i class="bi bi-plus-lg"></i> Add Layer
-      </button>
+  {/if}
+  {#if layer.showDetails}
+    <div class="layer-children">
+      {#each layer.children as child}
+        <Layer layer={child} {socket} {selectedColor} {selectColor} {rerender} {render} />
+      {/each}
+      <div class="color-button">
+        <button on:click={newLayer}>
+          <i class="bi bi-plus-lg"></i> Add Layer
+        </button>
+      </div>
     </div>
-  </div>
+  {/if}
 </div>
 
 <style>

@@ -806,6 +806,9 @@ export class Layer {
   children: Layer[];
   quadtree: Quadtree;
   opacity: number;
+  showDetails: boolean;
+  showColors: boolean;
+
   constructor(name: string, parent: Map | Layer) {
     this.name = name;
     this.parent = parent;
@@ -814,6 +817,8 @@ export class Layer {
     this.quadtree = new Quadtree(this.colors[0].id, this);
     this.id = getMap(parent).getNextLayerId();
     this.opacity = 1.0;
+    this.showDetails = true;
+    this.showColors = true;
   }
 
   /* colors */
