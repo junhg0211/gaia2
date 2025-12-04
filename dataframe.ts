@@ -725,7 +725,6 @@ export class Quadtree {
     if (this.children === null)
       throw new Error("Quadtree children should not be null when drawing divided node.");
     offscreenCtx.imageSmoothingEnabled = false;
-    offscreenCtx.clearRect(0, 0, imgSize, imgSize);
     offscreenCtx.drawImage(this.getChild(0).image!, 0, 0, halfSize, halfSize);
     offscreenCtx.drawImage(this.getChild(1).image!, halfSize, 0, halfSize, halfSize);
     offscreenCtx.drawImage(this.getChild(2).image!, 0, halfSize, halfSize, halfSize);
