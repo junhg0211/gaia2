@@ -1432,7 +1432,7 @@
   }
 
   .properties-container {
-    width: 200px;
+    width: 300px;
     padding: 8px;
   }
 

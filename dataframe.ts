@@ -808,6 +808,7 @@ export class Layer {
   opacity: number;
   showDetails: boolean;
   showColors: boolean;
+  visible: boolean;
 
   constructor(name: string, parent: Map | Layer) {
     this.name = name;
@@ -819,6 +820,7 @@ export class Layer {
     this.opacity = 1.0;
     this.showDetails = true;
     this.showColors = true;
+    this.visible = true;
   }
 
   /* colors */
@@ -884,9 +886,10 @@ export class Layer {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
-    ctx.globalAlpha = this.opacity;
-    this.quadtree.render(ctx, camera, canvas, this.getColorMap());
-    ctx.globalAlpha = 1.0;
+    if (this.visible) {
+      ctx.globalAlpha = this.opacity;
+      this.quadtree.render(ctx, camera, canvas, this.getColorMap());
+    }
     for (const child of this.children) {
       child.render(ctx, camera, canvas);
     }

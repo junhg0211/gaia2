@@ -47,8 +47,9 @@
 <div class="layer-item">
   <div>
     <button class="layer-name" on:click={renameLayer}>{layer.name}</button>
-    <input type="checkbox" bind:checked={layer.showDetails} title="Toggle Layer Folded" />
+    <input type="checkbox" bind:checked={layer.visible} on:change={render} title="Toggle Layer Visibility" />
     <input type="checkbox" bind:checked={layer.showColors} title="Toggle Layer Color Folded" />
+    <input type="checkbox" bind:checked={layer.showDetails} title="Toggle Layer Folded" />
     {#if removeable}
       <button on:click={removeLayer} class="delete-button" aria-label="rename">
         <i class="bi bi-trash"></i>
