@@ -816,7 +816,7 @@ export class Layer {
   }
 
   renderLabels(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
-    ctx.font = "16px Arial";
+    ctx.font = `${12 * window.devicePixelRatio}px Arial`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     for (const color of this.colors) {
@@ -840,7 +840,7 @@ export class Layer {
 
       ctx.fillStyle = "black";
       const textWidth = ctx.measureText(color.name).width;
-      ctx.fillRect(x + 10, y - 10, textWidth + 5, 20);
+      ctx.fillRect(x + 10, y - 10, textWidth + 5, 12 * window.devicePixelRatio);
 
       ctx.fillStyle = "white";
       ctx.fillText(color.name, x + 10, y);
@@ -1044,11 +1044,19 @@ export function mapFromJSON(json: any): Map {
 export function layerFromJSON(json: any, parent: Map | Layer): Layer {
   const layer = new Layer(json.name, parent);
   layer.id = json.id;
-  layer.colors = json.colors.map((colorJson: { name: string; color: string; id: number; locked: boolean; filterAts: number[] }) => {
+  layer.colors = json.colors.map((colorJson: {
+    name: string;
+    color: string;
+    id: number;
+    locked: boolean;
+    filterAts: number[];
+    labelPosition?: { x: number; y: number };
+  }) => {
     const color = new Color(colorJson.name, colorJson.color, layer);
     color.id = colorJson.id;
     color.locked = colorJson.locked;
     color.filterAts = colorJson.filterAts || [];
+    color.labelPosition = colorJson.labelPosition || { x: 0, y: 0 };
     return color;
   });
   layer.quadtree = quadtreeFromJSON(json.quadtree, layer);

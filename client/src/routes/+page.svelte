@@ -734,6 +734,14 @@
       name: "영역 레이블 위치 설정",
       shortcut: 't',
       icon: 'tag',
+      onstart: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'crosshair';
+      },
+      onend: () => {
+        if (!canvas) return;
+        canvas.style.cursor = 'default';
+      },
       onmousebuttonup: (e: MouseEvent) => {
         if (!ctx) return;
         if (!map) return;
