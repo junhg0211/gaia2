@@ -70,10 +70,14 @@
         const brushSize = parseFloat(args[4]);
         const colorId = parseInt(args[5]);
         const depth = parseInt(args[6]);
-        const layer = map!.layer;
         const color = map!.getColorById(colorId);
+        const layer = color?.parent;
         if (!color) return;
+        if (!layer) return;
         layer.quadtree.drawLine(x0, y0, x1, y1, color, brushSize, depth);
+        if (!toolVar.isDrawing) {
+          layer.draw();
+        }
         render();
       }
     },

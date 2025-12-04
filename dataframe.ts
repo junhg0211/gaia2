@@ -312,7 +312,17 @@ export class Quadtree {
 
   /* image representation */
   fillPolygon(polygon: [number, number][], color: Color, depth: number) {
-    if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
+    // Fresh cache for each top-level fill operation
+    const isTopLevel = !(Quadtree as any)._fillInProgress;
+    if (isTopLevel) {
+      (Quadtree as any)._fillInProgress = true;
+      (Quadtree as any)._opCache = new globalThis.Map();
+    }
+
+    if (this.value !== null && this.getLayer().getColor(this.value).locked) {
+      if (isTopLevel) (Quadtree as any)._fillInProgress = false;
+      return;
+    }
 
     this.changes = true;
 
@@ -346,7 +356,6 @@ export class Quadtree {
       );
       const largePolygon = polygonArea > 0.05; // heuristic threshold in unit square
       // Per-operation cache for overlap queries keyed by layer+color+node
-      const opCache = (Quadtree as any)._opCache as globalThis.Map<string, boolean> | undefined;
       if (!(Quadtree as any)._opCache) (Quadtree as any)._opCache = new globalThis.Map();
       const cache: globalThis.Map<string, boolean> = (Quadtree as any)._opCache;
 
@@ -414,19 +423,75 @@ export class Quadtree {
     this.getChild(2).fillPolygon(polygon.map(p => [p[0] * 2, p[1] * 2 - 1]), color, depth - 1);
     this.getChild(3).fillPolygon(polygon.map(p => [p[0] * 2 - 1, p[1] * 2 - 1]), color, depth - 1);
     this.mergeIfPossible();
+
+    // Mark top-level operation complete
+    const wasTopLevel = (Quadtree as any)._fillInProgress;
+    if (depth > 0 && wasTopLevel) {
+      (Quadtree as any)._fillInProgress = false;
+    }
   }
 
   fillCircle(x: number, y: number, radius: number, color: Color, depth: number) {
-    if (this.value !== null && this.getLayer().getColor(this.value).locked) return;
+    // Fresh cache for each top-level fill operation
+    const isTopLevel = !(Quadtree as any)._fillInProgress;
+    if (isTopLevel) {
+      (Quadtree as any)._fillInProgress = true;
+      (Quadtree as any)._opCache = new globalThis.Map();
+    }
+
+    if (this.value !== null && this.getLayer().getColor(this.value).locked) {
+      if (isTopLevel) (Quadtree as any)._fillInProgress = false;
+      return;
+    }
 
     this.changes = true;
 
     if (depth <= 0 || depth === undefined) {
+      // Base case: check if center is inside circle
       const distance = Math.hypot(x - 0.5, y - 0.5);
       const containsCenter = distance <= radius;
 
-      if (containsCenter) return this.setValue(color.id);
-      else return;
+      if (!containsCenter) return;
+
+      // Center is inside - check filters like fillPolygon does
+      const [rx0, ry0, rx1, ry1] = this.getBoundingBox();
+
+      if (!(Quadtree as any)._opCache) (Quadtree as any)._opCache = new globalThis.Map();
+      const cache: globalThis.Map<string, boolean> = (Quadtree as any)._opCache;
+
+      const overlapsColorInRegion = (root: Quadtree, target: number, layerId: number): boolean => {
+        const key = `${layerId}:${target}:${rx0},${ry0},${rx1},${ry1}`;
+        const cached = cache.get(key);
+        if (cached !== undefined) return cached;
+
+        const dfs = (n: Quadtree, nx0: number, ny0: number, nx1: number, ny1: number): boolean => {
+          if (nx1 <= rx0 || nx0 >= rx1 || ny1 <= ry0 || ny0 >= ry1) return false;
+          if (n.isLeaf()) return n.getValue() === target;
+          const midX = (nx0 + nx1) / 2;
+          const midY = (ny0 + ny1) / 2;
+          return (
+            dfs(n.getChild(0), nx0, ny0, midX, midY) ||
+            dfs(n.getChild(1), midX, ny0, nx1, midY) ||
+            dfs(n.getChild(2), nx0, midY, midX, ny1) ||
+            dfs(n.getChild(3), midX, midY, nx1, ny1)
+          );
+        };
+        const result = dfs(root, 0, 0, 1, 1);
+        cache.set(key, result);
+        return result;
+      };
+
+      let possible = color.filterAts.length === 0;
+      if (!possible && color.filterAts.length > 0) {
+        const map = getMap(this.getLayer());
+        for (const filterAt of color.filterAts) {
+          const layer: Layer = map.getLayerByColorId(filterAt);
+          if (overlapsColorInRegion(layer.quadtree, filterAt, layer.id)) { possible = true; break; }
+        }
+      }
+
+      if (!possible) return;
+      return this.setValue(color.id);
     }
 
     /* check if circle is completely outside this quadtree node */
@@ -437,21 +502,28 @@ export class Quadtree {
     if (distance >= radius)
       return;
 
-    /* check if circle completely contains this quadtree node */
+    /* check if circle completely contains this quadtree node - recurse to preserve detail */
     const maxDistance = Math.max(
       Math.hypot(x - 0, y - 0),
       Math.hypot(x - 1, y - 0),
       Math.hypot(x - 0, y - 1),
       Math.hypot(x - 1, y - 1)
     );
-    if (maxDistance <= radius) return this.setValue(color.id);
-
+    
+    // Even if circle completely contains this node, subdivide and recurse
+    // to respect filter details at deeper levels
     this.subdivide();
     this.getChild(0).fillCircle(x * 2, y * 2, radius * 2, color, depth - 1);
     this.getChild(1).fillCircle(x * 2 - 1, y * 2, radius * 2, color, depth - 1);
     this.getChild(2).fillCircle(x * 2, y * 2 - 1, radius * 2, color, depth - 1);
     this.getChild(3).fillCircle(x * 2 - 1, y * 2 - 1, radius * 2, color, depth - 1);
     this.mergeIfPossible();
+
+    // Mark top-level operation complete
+    const wasTopLevel = (Quadtree as any)._fillInProgress;
+    if (depth > 0 && wasTopLevel) {
+      (Quadtree as any)._fillInProgress = false;
+    }
   }
 
   fillRect(x0: number, y0: number, x1: number, y1: number, value: number, depth: number) {
