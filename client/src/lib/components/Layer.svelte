@@ -12,10 +12,19 @@
   export let render: () => void;
   export let removeable: boolean = true;
 
+  function getRandoMColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  }
+
   function newColor() {
     const colorName = prompt("색상의 이름을 입력하세요:");
     if (!colorName) return;
-    const colorValue = prompt("색상의 값(헥스)을 입력하세요:", "#ffffff");
+    const colorValue = prompt("색상의 값(헥스)을 입력하세요:", getRandomColor());
     if (!colorValue) return;
     socket.send(`newcolor\t${layer.id}\t${colorName}\t${colorValue}`);
   }
