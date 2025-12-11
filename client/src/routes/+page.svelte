@@ -507,6 +507,8 @@
   function onwheel(event: WheelEvent) {
     if (!ctx) return;
     if (!camera) return;
+    if (mouse.x < 0 || mouse.y < 0) return;
+    if (mouse.x > canvas.width / window.devicePixelRatio || mouse.y > canvas.height / window.devicePixelRatio) return;
 
     if (keys.has("Alt")) {
       const normalDelta = event.deltaX + event.deltaY;
@@ -1434,6 +1436,8 @@
   .properties-container {
     width: 300px;
     padding: 8px;
+    max-height: 100vh;
+    overflow-y: auto;
   }
 
   .properties-section {
