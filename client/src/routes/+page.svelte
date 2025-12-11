@@ -508,7 +508,7 @@
     if (!ctx) return;
     if (!camera) return;
     if (mouse.x < 0 || mouse.y < 0) return;
-    if (mouse.x > canvas.width / window.devicePixelRatio || mouse.y > canvas.height / window.devicePixelRatio) return;
+    if (mouse.x > canvas.width || mouse.y > canvas.height) return;
 
     if (keys.has("Alt")) {
       const normalDelta = event.deltaX + event.deltaY;
