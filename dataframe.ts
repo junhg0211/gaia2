@@ -888,6 +888,7 @@ export class Layer {
     if (this.visible) {
       ctx.globalAlpha = this.opacity;
       this.quadtree.render(ctx, camera, canvas, this.getColorMap());
+      ctx.globalAlpha = 1.0;
     }
     for (const child of this.children) {
       child.render(ctx, camera, canvas);
