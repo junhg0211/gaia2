@@ -75,6 +75,12 @@
       }, 0);
     }
   });
+
+  let areaString: string = "";
+  $: {
+    const map = color.getMap();
+    areaString = (color.area * (map.size / 1_000_000 * map.size / 1_000_000)).toFixed(3).replaceAll(/\B(?=(\d{3})+(?!\d))/g, ",") + " km²";
+  }
 </script>
 
 <div class="color-item" class:selected={isSelected()}>
@@ -84,7 +90,7 @@
         &#x25CF; {color.name}
       </button>
       <div class="color-id">
-        #{color.id}
+        #{color.id}, {areaString}
       </div>
       <div class="color-filters">
         {#each color.filterAts as filterAt}

@@ -9,6 +9,7 @@ export class Color {
   locked: boolean;
   filterAts: number[];
   labelPosition: { x: number; y: number };
+  area: number;
   // Cache for mapping filter colorId -> owning Layer
   private _filterLayerCache?: globalThis.Map<number, Layer>;
 
@@ -20,11 +21,16 @@ export class Color {
     this.locked = false;
     this.filterAts = [];
     this.labelPosition = { x: 0, y: 0 };
+    this.area = 0;
   }
 
   /* get layer */
   getLayer(): Layer {
     return this.parent;
+  }
+
+  getMap(): Map {
+    return getMap(this.parent);
   }
 
   /* serialization */
@@ -680,7 +686,6 @@ export class Quadtree {
     this.changes = false;
 
     const depth = this.getDepth();
-
     if (depth <= 4) {
       this.image = document.createElement("canvas");
       this.image.width = 1 << depth;
@@ -691,6 +696,13 @@ export class Quadtree {
         if (node.isLeaf()) {
           offscreenCtx.fillStyle = colorMap[node.getValue() ?? -1];
           offscreenCtx.fillRect(x, y, size, size);
+
+          // calculate color area using exact unit-square bounding box
+          const [bx0, by0, bx1, by1] = node.getBoundingBox();
+          const area = (bx1 - bx0) * (by1 - by0);
+          const color = node.getLayer().getColor(node.getValue() ?? -1);
+          color.area += area;
+
           return;
         }
 
@@ -881,6 +893,7 @@ export class Layer {
 
   /* draw on ctx */
   draw() {
+    this.colors.forEach(color => color.area = 0);
     this.quadtree.draw(this.getColorMap());
   }
 
