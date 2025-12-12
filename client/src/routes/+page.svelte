@@ -509,6 +509,8 @@
     if (!camera) return;
     if (mouse.x < 0 || mouse.y < 0) return;
     if (mouse.x > canvas.width || mouse.y > canvas.height) return;
+    // prevent page scroll when interacting over the canvas
+    event.preventDefault();
 
     if (keys.has("Alt")) {
       const normalDelta = event.deltaX + event.deltaY;
@@ -1099,7 +1101,8 @@
     canvas.addEventListener('mousemove', onmousemove);
     canvas.addEventListener('mousedown', onmousebuttondown);
     canvas.addEventListener('mouseup', onmousebuttonup);
-    window.addEventListener('wheel', onwheel);
+    // listen to wheel on canvas only, and allow preventDefault
+    canvas.addEventListener('wheel', onwheel, { passive: false });
 
     /* Initialize WebSocket */
     const defaultHost = 'sch.shtelo.org';
