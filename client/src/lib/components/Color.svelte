@@ -84,7 +84,9 @@
         &#x25CF; {color.name}
       </button>
       <div class="color-id">
-        #{color.id} |
+        #{color.id}
+      </div>
+      <div class="color-filters">
         {#each color.filterAts as filterAt}
           <button on:click={() => {
             socket.send(`removecolorfilter\t${color.id}\t${filterAt}`);
@@ -157,10 +159,9 @@
   .color-id {
     font-size: 10px;
     color: #aaaaaa;
-    margin-left: 8px;
   }
 
-  .color-id input[type="text"] {
+  .color-filters input[type="text"] {
     width: 20px;
     background: none;
     border: none;
@@ -170,7 +171,7 @@
     transition: all 0.2s;
   }
 
-  .color-id input[type="text"]:focus {
+  .color-filters input[type="text"]:focus {
     outline: none;
     border-bottom: 0.5px solid #ffffff;
   }
